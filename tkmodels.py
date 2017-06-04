@@ -7,6 +7,8 @@ from tkinter import filedialog
 import constants as c
 import tkinter.constants as tkc
 import utils
+from PIL import Image, ImageTk
+import time
 import os
 import sys
 
@@ -31,6 +33,20 @@ class StyledFrame(tkinter.Frame):
         self.config(
             relief=tkc.RAISED
         )
+        self.parent = parent
+        self.root = utils.tk_get_root(self)
+
+    def init_ui(self):
+        pass
+
+
+class StyledTopLevel(tkinter.Toplevel):
+    def __init__(self, parent, **kwargs):
+        tkinter.Toplevel.__init__(self, parent, **kwargs)
+
+        self.overrideredirect(True)
+        self.attributes('-topmost', True)
+        self.is_viewing = False
         self.parent = parent
         self.root = utils.tk_get_root(self)
 
@@ -67,6 +83,7 @@ class RootFrame(Tk):
         self.w, self.h = 425, 350
 
         self.parent = parent
+
         self.init_ui()
 
     def init_ui(self):
@@ -83,13 +100,14 @@ class RootFrame(Tk):
         self.geometry(
             '%dx%d+%d+%d' % (self.w, self.h, center_x, center_y)
         )
-        self.update()
+        #TODO: show splash
+        #self.frame_splash = RootSplashFrame(self)
+        self.update_idletasks()
 
-        #self.splash = RootSplashFrame(self)
-        self.main_frame = RootMainFrame(self)
-        self.tool_frame = RootToolFrame(self)
-        self.menu_frame = RootMenuFrame(self)
-        #self.footer_frame = RootFooterFrame(self)
+        self.frame_main = RootMainFrame(self)
+        self.frame_tool = RootToolFrame(self)
+        self.frame_menu = RootMenuFrame(self)
+        #self.frame_footer = RootFooterFrame(self)
         #self.control_frame = RootViewControlFrame(self)
 
         self.bind(
@@ -179,6 +197,50 @@ class RootFrame(Tk):
 
     def track_events(self):
         self.after(50, self.track_events)
+
+
+class RootSplashFrame(StyledTopLevel):
+    def __init__(self, parent, **kwargs):
+        StyledTopLevel.__init__(self, parent, **kwargs)
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.config(
+            bg=c.COLOR_DARK_KNIGHT
+        )
+        center_x, center_y = self.root.center_frame()
+        #TODO: fix image size
+        self.image_logo = tkinter.PhotoImage(
+            file=os.path.join(DIR_IMAGES, "logo_apogeeworks.gif")
+        )
+        self.canvas_logo = tkinter.Canvas(
+            master=self,
+            bg=c.COLOR_DARK_KNIGHT,
+            border=None,
+            width=400, height=161,
+            bd=0,
+            highlightthickness=0,
+            relief='ridge'
+        )
+        self.canvas_logo.create_image(0, 0, image=self.image_logo, anchor=tkc.NW)
+
+        self.geometry(
+            '%dx%d+%d+%d' % (self.root.w, self.root.h, center_x, center_y)
+        )
+        self.canvas_logo.pack(
+            expand=tkc.YES,
+        )
+
+        self.show_logo()
+
+    def show_logo(self, duration_seconds=2):
+        self.update()
+        self.after(2000, self.hide_logo)
+
+    def hide_logo(self):
+        self.after_cancel(self.hide_logo)
+        self.destroy()
 
 
 class RootToolFrame(StyledFrame):
