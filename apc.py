@@ -6,6 +6,7 @@ __version__ = '0.1'
 from shutil import copyfile
 import constants as c
 from tkmodels import RootFrame
+from datetime import datetime
 import bs4
 import sys
 import os
@@ -111,6 +112,9 @@ def main(file_wpl, dir_target):
 if __name__ == '__main__':
     #wpl = sys.argv[1]
     #target_dir = sys.argv[2]
+    datetime_process_start = datetime.now()
     root = RootFrame(None)
+    root.console("process started @ %s" % datetime_process_start)
+    root.console("waiting for verified paths...")
     root.mainloop()
     #main(wpl, target_dir)

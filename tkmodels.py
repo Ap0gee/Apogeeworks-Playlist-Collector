@@ -54,6 +54,41 @@ class StyledTopLevel(tkinter.Toplevel):
         pass
 
 
+class SizedListBox(tkinter.Frame):
+    def __init__(self, master, width=0, height=0, **kwargs):
+        self.width = width
+        self.height = height
+        tkinter.Frame.__init__(self, master, width=self.width, height=self.height)
+
+        self.widget = tkinter.Listbox(
+            self,
+            font=utils.tk_font(size=10),
+            highlightbackground=c.COLOR_WHITE,
+            highlightcolor=c.COLOR_BLUE,
+            highlightthickness=0,
+        )
+        sb_y = ttk.Scrollbar(
+            orient=tkc.VERTICAL,
+            command=self.widget.yview
+        )
+        sb_y.pack(
+            in_=self.widget, side=tkc.RIGHT, fill=tkc.Y
+        )
+        self.widget['yscroll'] = sb_y.set
+
+        self.widget.pack(expand=tkc.YES, fill=tkc.BOTH)
+
+    def pack(self, *args, **kwargs):
+        tkinter.Frame.pack(self, *args, **kwargs)
+        self.pack_propagate(False)
+        return self.widget
+
+    def grid(self, *args, **kwargs):
+        tkinter.Frame.grid(self, *args, **kwargs)
+        self.grid_propagate(False)
+        return self.widget
+
+
 class RootFrame(Tk):
     def __init__(self, parent, **kwargs):
         Tk.__init__(self, **kwargs)
@@ -80,7 +115,7 @@ class RootFrame(Tk):
             's': lambda x: str(x).strip(),
         }
 
-        self.w, self.h = 425, 350
+        self.w, self.h = 425, 425
 
         self.parent = parent
 
@@ -107,7 +142,7 @@ class RootFrame(Tk):
         self.frame_main = RootMainFrame(self)
         self.frame_tool = RootToolFrame(self)
         self.frame_menu = RootMenuFrame(self)
-        #self.frame_footer = RootFooterFrame(self)
+        self.frame_footer = RootFooterFrame(self)
         #self.control_frame = RootViewControlFrame(self)
 
         self.bind(
@@ -139,6 +174,7 @@ class RootFrame(Tk):
             81: self.destroy, #"<Alt-q>"
         }
 
+        self.track_events()
         self.update()
 
     def on_hover(self, event):
@@ -198,6 +234,8 @@ class RootFrame(Tk):
     def track_events(self):
         self.after(50, self.track_events)
 
+    def console(self, msg):
+        self.frame_main.console(msg)
 
 class RootSplashFrame(StyledTopLevel):
     def __init__(self, parent, **kwargs):
@@ -447,12 +485,13 @@ class RootMainFrame(StyledFrame):
         )
         self.control_panel = StyledFrame(
             self,
-            width=400,
-            height=263,
+            width=self.root.w - 25,
+            height=self.root.h - 120,
             relief=tkc.RAISED
         )
         self.group_playlist = tkinter.LabelFrame(
             self.control_panel,
+            font=utils.tk_font(size=10, weight=c.FONT_WEIGHT_BOLD),
             text="Media Playlist",
         )
         self.label_playlist_path_entry = tkinter.Label(
@@ -465,6 +504,7 @@ class RootMainFrame(StyledFrame):
         )
         self.group_collection = tkinter.LabelFrame(
             self.control_panel,
+            font=utils.tk_font(size=10, weight=c.FONT_WEIGHT_BOLD),
             text="Collection Location",
         )
         self.label_collection_path_entry = tkinter.Label(
@@ -492,6 +532,15 @@ class RootMainFrame(StyledFrame):
             relief=tkc.RAISED,
             command=lambda: self.open_directory(self.entry_collection_path)
         )
+        self.group_console = tkinter.LabelFrame(
+            self.control_panel,
+            font=utils.tk_font(size=10, weight=c.FONT_WEIGHT_BOLD),
+            text="Console Output",
+        )
+        self.listbox_console_output = SizedListBox(
+            self.group_console,
+            height=100,
+        )
         self.btn_close_label = tkinter.Label(
             self.control_panel,
             text="",
@@ -511,27 +560,52 @@ class RootMainFrame(StyledFrame):
             command=None
         )
         self.pack(
-            pady=(25, 0)
         )
         self.control_panel.pack(
-            pady=(11, 0)
+            pady=(10, 0)
         )
-
-        self.group_playlist.pack(fill=tkc.X)
-        self.label_playlist_path_entry.grid(row=0, column=0)
-        self.entry_playlist_path.grid(row=0, column=1, padx=(37, 0), pady=(0, 5))
-        self.browser_playlist_path.grid(row=0, column=2, padx=(0, 0), pady=(0, 5))
-
-        self.group_collection.pack(fill=tkc.X)
-        self.label_collection_path_entry.grid(row=0, column=0)
-        self.entry_collection_path.grid(row=0, column=1, padx=(7, 0), pady=(0, 5))
-        self.browser_collection_path.grid(row=0, column=2, padx=(0, 0), pady=(0, 5))
-
+        self.group_playlist.pack(
+            fill=tkc.X
+        )
+        self.label_playlist_path_entry.grid(
+            row=0, column=0,
+            padx=(0, 0), pady=(0, 5)
+        )
+        self.entry_playlist_path.grid(
+            row=0, column=1,
+            padx=(37, 0), pady=(0, 5)
+        )
+        self.browser_playlist_path.grid(
+            row=0, column=2,
+            padx=(0, 0), pady=(0, 5)
+        )
+        self.group_collection.pack(
+            fill=tkc.X,
+            pady=(15, 0)
+        )
+        self.label_collection_path_entry.grid(
+            row=0, column=0,
+            padx=(0, 0), pady=(0, 5)
+        )
+        self.entry_collection_path.grid(
+            row=0, column=1,
+            padx=(7, 0), pady=(0, 5)
+        )
+        self.browser_collection_path.grid(
+            row=0, column=2,
+            padx=(0, 0), pady=(0, 5)
+        )
+        self.group_console.pack(
+            fill=tkc.X,
+            pady=(15, 0)
+        )
+        self.listbox_console_output = self.listbox_console_output.pack(
+            fill=tkc.X,
+            pady=(0, 5),
+            padx=(5, 5)
+        )
         self.btn_close.place(
-            x=335, y=231
-        )
-        self.btn_close_label.place(
-            x=240, y=235
+            x=335, y=273
         )
         self.grid(
             column=0, row=1,
@@ -539,6 +613,8 @@ class RootMainFrame(StyledFrame):
         )
 
         self.track_path_entries()
+        self.track_console_output()
+
         self.update()
 
     def open_file(self, tk_entry):
@@ -558,6 +634,11 @@ class RootMainFrame(StyledFrame):
     def verify_path_playlist(self, path):
         file_name, ext = os.path.splitext(path)
         return os.path.exists(path) and ext == '.wpl'
+
+    def console(self, msg):
+        self.listbox_console_output.insert(tkc.END, msg)
+        self.listbox_console_output.selection_clear(0, tkc.END)
+        self.listbox_console_output.see(tkc.END)
 
     def track_path_entries(self):
         map_tracked_entries = {
@@ -587,3 +668,49 @@ class RootMainFrame(StyledFrame):
             print(e)
             #TODO: add error message in footer rather than close
             self.root.after_cancel(self.track_path_entries)
+
+    def track_console_output(self):
+        pass
+
+
+class RootFooterFrame(StyledFrame):
+    def __init__(self, parent, **kwargs):
+       StyledFrame.__init__(self, parent, **kwargs)
+
+       self.init_ui()
+
+    def init_ui(self):
+        self.config(
+            bg=c.COLOR_RED,
+            height=40,
+        )
+        self.info_label = tkinter.Label(
+            self,
+            width=325,
+            font=utils.tk_font(),
+        )
+        self.id_label = tkinter.Label(
+            self,
+            fg=c.COLOR_WHITE,
+            bg=c.COLOR_BLUE,
+            font=utils.tk_font(),
+            height=40, width=6,
+        )
+        self.pack(
+            side=tkc.BOTTOM,
+            fill=tkc.X
+        )
+
+        self.refresh()
+
+    def refresh(self):
+        self.id_label.pack(
+            in_=self,
+            side=tkc.LEFT
+        )
+        self.info_label.pack(
+            in_=self,
+            side=tkc.LEFT,
+            fill=tkc.BOTH
+        )
+        self.update()
