@@ -7,8 +7,6 @@ from tkinter import filedialog
 import constants as c
 import tkinter.constants as tkc
 import utils
-from PIL import Image, ImageTk
-import time
 import os
 import sys
 
@@ -236,6 +234,7 @@ class RootFrame(Tk):
 
     def console(self, msg):
         self.frame_main.console(msg)
+
 
 class RootSplashFrame(StyledTopLevel):
     def __init__(self, parent, **kwargs):
@@ -553,7 +552,7 @@ class RootMainFrame(StyledFrame):
             self.control_panel,
             text="START",
             font=utils.tk_font(),
-            width=6, height=1,
+            width=8, height=1,
             bg=c.COLOR_GREEN,
             fg=c.COLOR_WHITE,
             relief=tkc.FLAT,
@@ -605,7 +604,7 @@ class RootMainFrame(StyledFrame):
             padx=(5, 5)
         )
         self.btn_close.place(
-            x=335, y=273
+            x=320, y=273
         )
         self.grid(
             column=0, row=1,
