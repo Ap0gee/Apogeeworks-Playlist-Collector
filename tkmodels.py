@@ -6,6 +6,7 @@ from tkinter import Tk
 from tkinter import filedialog
 import constants as c
 import tkinter.constants as tkc
+from datetime import datetime
 import utils
 import os
 import sys
@@ -173,6 +174,7 @@ class RootFrame(Tk):
         }
 
         self.track_events()
+        self.on_start()
         self.update()
 
     def on_hover(self, event):
@@ -216,11 +218,6 @@ class RootFrame(Tk):
         self.attributes("-alpha", 1)
         self.is_cloaked = False
 
-    def kill_splash(self):
-        self.update()
-        self.update_idletasks()
-        self.splash.destroy()
-
     def track_cursor(self):
         if not self.busy:
             cursor_x, cursor_y = self.winfo_pointerxy()
@@ -232,9 +229,19 @@ class RootFrame(Tk):
     def track_events(self):
         self.after(50, self.track_events)
 
+    def alert_action_info(self, text, fg="white", bg=c.COLOR_ORANGE, font=utils.tk_font()):
+        self.frame_footer.label_action_info.config(fg=fg, bg=bg, font=font, text=text)
+
+    def alert_action_symbol(self, text, fg="white", bg=c.COLOR_BLUE):
+        self.frame_footer.label_action_symbol.config(fg=fg, bg=bg, text=text)
+
     def console(self, msg):
         self.frame_main.console(msg)
 
+    def on_start(self):
+        datetime_process_start = datetime.now()
+        self.console("process started @ %s" % datetime_process_start)
+        self.console("waiting for verified paths...")
 
 class RootSplashFrame(StyledTopLevel):
     def __init__(self, parent, **kwargs):
@@ -683,12 +690,12 @@ class RootFooterFrame(StyledFrame):
             bg=c.COLOR_RED,
             height=40,
         )
-        self.info_label = tkinter.Label(
+        self.label_action_info = tkinter.Label(
             self,
             width=325,
             font=utils.tk_font(),
         )
-        self.id_label = tkinter.Label(
+        self.label_action_symbol = tkinter.Label(
             self,
             fg=c.COLOR_WHITE,
             bg=c.COLOR_BLUE,
@@ -703,11 +710,11 @@ class RootFooterFrame(StyledFrame):
         self.refresh()
 
     def refresh(self):
-        self.id_label.pack(
+        self.label_action_symbol.pack(
             in_=self,
             side=tkc.LEFT
         )
-        self.info_label.pack(
+        self.label_action_info.pack(
             in_=self,
             side=tkc.LEFT,
             fill=tkc.BOTH
