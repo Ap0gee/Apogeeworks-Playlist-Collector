@@ -100,25 +100,43 @@ class RootFrame(Tk):
         self.style.theme_use("default")
         self.attributes('-topmost', False)
 
-        self.busy = False
-        self.in_menu = False
-        self.btn_hover = False
-
-        self.config_data = {}
-        self.map_var_config = {}
-
-        self.config_type_map = {
-            'b': lambda x: int(x),
-            'i': lambda x: int(x),
-            'f': lambda x: float(x),
-            's': lambda x: str(x).strip(),
-        }
-
         self.w, self.h = 425, 425
 
         self.parent = parent
 
         self.init_ui()
+
+        self.bind(
+            "<Map>", self.bind_redirect
+        )
+
+        # self.bind_all("<Key>", self.track_keys)
+        self.bind_all("<Control-l>", self.track_keys)
+        self.bind_all("<Control-e>", self.track_keys)
+        self.bind_all("<Control-k>", self.track_keys)
+        self.bind_all("<Control-d>", self.track_keys)
+        self.bind_all("<Control-m>", self.track_keys)
+        self.bind_all("<Control-n>", self.track_keys)
+        self.bind_all("<Control-s>", self.track_keys)
+        self.bind_all("<Alt-i>", self.track_keys)
+        self.bind_all("<Alt-x>", self.track_keys)
+        self.bind_all("<Alt-q>", self.track_keys)
+
+        self.key_map = {
+            #     76: self.menu_frame.viewLoadGroup, #"<Control-l>"
+            #     75: self.menu_frame.askClearGroup, #"<Control-k>"
+            #     69: self.menu_frame.viewEditGroup, #"<Control-e>"
+            #     68: self.menu_frame.askDeleteGroup, #"<Control-d>"
+            #     78: self.menu_frame.viewNewGroup, #"<Control-n>"
+            #     77: self.menu_frame.viewDeleteMultipleGroup, #"<Control-m>"
+            #     83: self.summoned, #"<Control-s>"
+            #     73: self.destroy, #"<Alt-i>"
+            #     88: self.destroy, #"<Alt-x>"
+            81: self.destroy,  # "<Alt-q>"
+        }
+
+        self.track_events()
+        self.on_start()
 
     def init_ui(self):
         self.title("Apogeeworks Playlist Collector")
@@ -144,37 +162,6 @@ class RootFrame(Tk):
         self.frame_footer = RootFooterFrame(self)
         #self.control_frame = RootViewControlFrame(self)
 
-        self.bind(
-            "<Map>", self.bind_redirect
-        )
-
-        #self.bind_all("<Key>", self.track_keys)
-        self.bind_all("<Control-l>", self.track_keys)
-        self.bind_all("<Control-e>", self.track_keys)
-        self.bind_all("<Control-k>", self.track_keys)
-        self.bind_all("<Control-d>", self.track_keys)
-        self.bind_all("<Control-m>", self.track_keys)
-        self.bind_all("<Control-n>", self.track_keys)
-        self.bind_all("<Control-s>", self.track_keys)
-        self.bind_all("<Alt-i>", self.track_keys)
-        self.bind_all("<Alt-x>", self.track_keys)
-        self.bind_all("<Alt-q>", self.track_keys)
-
-        self.key_map = {
-        #     76: self.menu_frame.viewLoadGroup, #"<Control-l>"
-        #     75: self.menu_frame.askClearGroup, #"<Control-k>"
-        #     69: self.menu_frame.viewEditGroup, #"<Control-e>"
-        #     68: self.menu_frame.askDeleteGroup, #"<Control-d>"
-        #     78: self.menu_frame.viewNewGroup, #"<Control-n>"
-        #     77: self.menu_frame.viewDeleteMultipleGroup, #"<Control-m>"
-        #     83: self.summoned, #"<Control-s>"
-        #     73: self.destroy, #"<Alt-i>"
-        #     88: self.destroy, #"<Alt-x>"
-            81: self.destroy, #"<Alt-q>"
-        }
-
-        self.track_events()
-        self.on_start()
         self.update()
 
     def on_hover(self, event):
@@ -223,8 +210,7 @@ class RootFrame(Tk):
             cursor_x, cursor_y = self.winfo_pointerxy()
 
     def track_keys(self, event):
-        if not self.busy:
-            self.key_map[event.keycode]()
+        self.key_map[event.keycode]()
 
     def track_events(self):
         self.after(50, self.track_events)
@@ -251,6 +237,7 @@ class RootSplashFrame(StyledTopLevel):
         StyledTopLevel.__init__(self, parent, **kwargs)
 
         self.init_ui()
+        self.show_logo()
 
     def init_ui(self):
         self.config(
@@ -279,8 +266,6 @@ class RootSplashFrame(StyledTopLevel):
             expand=tkc.YES,
         )
 
-        self.show_logo()
-
     def show_logo(self, duration_seconds=2):
         self.update()
         self.after(2000, self.hide_logo)
@@ -294,8 +279,20 @@ class RootToolFrame(StyledFrame):
     def __init__(self, parent, **kwargs):
         StyledFrame.__init__(self, parent, **kwargs)
 
-        self.dragging_parent = False
         self.init_ui()
+
+        self.bind("<ButtonPress-1>", self.start_move)
+        self.bind("<ButtonRelease-1>", self.stop_move)
+        self.bind("<B1-Motion>", self.on_motion)
+        self.tool_label.bind("<ButtonPress-1>", self.start_move)
+        self.tool_label.bind("<ButtonRelease-1>", self.stop_move)
+        self.tool_label.bind("<B1-Motion>", self.on_motion)
+        self.tool_label.bind("<Enter>", self.on_hover)
+        self.tool_label.bind("<Leave>", self.exit_hover)
+        self.btn_close.bind("<Enter>", self.on_hover)
+        self.btn_close.bind("<Leave>", self.exit_hover)
+        self.btn_minimize.bind("<Enter>", self.on_hover)
+        self.btn_minimize.bind("<Leave>", self.exit_hover)
 
     def init_ui(self):
         self.config(
@@ -330,20 +327,6 @@ class RootToolFrame(StyledFrame):
             relief=tkc.FLAT,
             command=self.parent.destroy
         )
-
-        self.bind("<ButtonPress-1>", self.start_move)
-        self.bind("<ButtonRelease-1>", self.stop_move)
-        self.bind("<B1-Motion>", self.on_motion)
-        self.tool_label.bind("<ButtonPress-1>", self.start_move)
-        self.tool_label.bind("<ButtonRelease-1>", self.stop_move)
-        self.tool_label.bind("<B1-Motion>", self.on_motion)
-        self.tool_label.bind("<Enter>", self.on_hover)
-        self.tool_label.bind("<Leave>", self.exit_hover)
-        self.btn_close.bind("<Enter>", self.on_hover)
-        self.btn_close.bind("<Leave>", self.exit_hover)
-        self.btn_minimize.bind("<Enter>", self.on_hover)
-        self.btn_minimize.bind("<Leave>", self.exit_hover)
-
         self.grid(
             column=0, row=0,
             sticky="ew"
@@ -397,7 +380,10 @@ class RootToolFrame(StyledFrame):
 class RootMenuFrame(StyledFrame):
     def __init__(self, parent, **kwargs):
        StyledFrame.__init__(self, parent, **kwargs)
+
        self.init_ui()
+
+       self.file_menu.bind("<<MenuSelect>>", self.menu_select_callback)
 
     def init_ui(self):
         self.config(
@@ -439,42 +425,39 @@ class RootMenuFrame(StyledFrame):
             side=tkc.LEFT,
             padx=(5, 0)
         )
-        file_menu = tkinter.Menu(
+        self.file_menu = tkinter.Menu(
             self.menu_file,
             tearoff=0
         )
-        self.menu_file['menu'] = file_menu
+        self.menu_file['menu'] = self.file_menu
 
-        options_menu = tkinter.Menu(
+        self.options_menu = tkinter.Menu(
             self.menu_options,
             tearoff=0
         )
-        self.menu_options['menu'] = options_menu
+        self.menu_options['menu'] = self.options_menu
 
-        file_menu.add_command(
+        self.file_menu.add_command(
             label="{0}{1}{2}".format("Quit", " "*8, "(Alt + Q)"),
             command=self.parent.destroy
         )
-        options_menu.add_command(
+        self.options_menu.add_command(
             label="Configure...",
             command=self.view_menu_config()
         )
-        options_menu.add_separator()
-        options_menu.add_command(
+        self.options_menu.add_separator()
+        self.options_menu.add_command(
             label="View Tutorial...",
             command=self.view_menu_tutorial()
         )
-        file_menu.bind("<<MenuSelect>>", self.menu_select_callback)
 
         self.update()
 
     def menu_select_callback(self, event):
         pass
-        #self.root.busy = True
 
     def view_menu_config(self):
         pass
-        #RootConfigureFrame(self.root)
 
     def view_menu_tutorial(self):
         pass
@@ -485,6 +468,25 @@ class RootMainFrame(StyledFrame):
         StyledFrame.__init__(self, parent, **kwargs)
 
         self.init_ui()
+
+        self.map_tracked_entries = {
+            'collection': {
+                'widget': self.entry_collection_path,
+                'verified': lambda path: os.path.isdir(path),
+                'set': False,
+                'last': "",
+                'browser': self.browser_collection_path
+            },
+            'playlist': {
+                'widget': self.entry_playlist_path,
+                'verified': lambda path: self.verify_path_playlist(path),
+                'set': False,
+                'last': "",
+                'browser': self.browser_playlist_path
+            }
+        }
+        self.track_path_entries()
+        self.track_console_output()
 
     def init_ui(self):
         self.config(
@@ -526,7 +528,7 @@ class RootMainFrame(StyledFrame):
         )
         self.browser_playlist_path= tkinter.Button(
             self.group_playlist,
-            text="Browse",
+            text="Change",
             width=6, height=1,
             relief=tkc.RAISED,
             command=lambda: self.open_file(self.entry_playlist_path)
@@ -618,9 +620,6 @@ class RootMainFrame(StyledFrame):
             pady=27
         )
 
-        self.track_path_entries()
-        self.track_console_output()
-
         self.update()
 
     def open_file(self, tk_entry):
@@ -647,35 +646,27 @@ class RootMainFrame(StyledFrame):
         self.listbox_console_output.see(tkc.END)
 
     def track_path_entries(self):
-        map_tracked_entries = {
-            'collection': {
-                'widget': self.entry_collection_path,
-                'verified': lambda path: os.path.isdir(path),
-                'set': False,
-                'last': ""
-            },
-            'playlist': {
-                'widget': self.entry_playlist_path,
-                'verified': lambda path: self.verify_path_playlist(path),
-                'set': False,
-                'last': ""
-            }
-        }
-        for _type, entry in map_tracked_entries.items():
-            widget = entry['widget']
-            verified = entry['verified'](widget.get())
-            last = entry['last']
+        for _type, entry in self.map_tracked_entries.items():
+            widget = entry.get('widget')
+            verified = entry.get('verified')(widget.get())
+            last = entry.get('last')
+            browser = entry.get('browser')
             if verified:
                 widget.config(bg=c.COLOR_GREEN)
-                map_tracked_entries[_type].update(set=True)
+                entry.update(set=True)
+                browser.config(text="Change")
                 if _type == 'playlist':
-                    if not map_tracked_entries['collection'].get('set'):
-                        self.set_collection_entry(os.path.dirname(widget.get()))
+                    path_playlist = widget.get()
+                    if last != path_playlist:
+                        dir_playlist = os.path.dirname(path_playlist)
+                        self.set_collection_entry(dir_playlist)
+                        entry.update(last=path_playlist)
             else:
                 widget.config(bg=c.COLOR_RED)
-                map_tracked_entries[_type].update(set=False)
+                entry.update(set=False)
+                browser.config(text="Browse")
 
-        if map_tracked_entries['playlist'].get('set') and map_tracked_entries['collection'].get('set'):
+        if self.map_tracked_entries['playlist'].get('set') and self.map_tracked_entries['collection'].get('set'):
             self.btn_close.config(
                 state=tkc.NORMAL,
                 bg=c.COLOR_GREEN
@@ -686,8 +677,7 @@ class RootMainFrame(StyledFrame):
                 bg=c.COLOR_CHARCOAL
             )
 
-        self.root.after(50, self.track_path_entries)
-
+        self.root.after(100, self.track_path_entries)
 
     def track_console_output(self):
         pass
