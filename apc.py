@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Apogee'
-__version__ = '0.1'
+
+from utils import get_version
+
+VERSION = (0, 1, 0)
+
+__version__ = get_version(VERSION)
 
 from shutil import copyfile
 import constants as c
 from tkmodels import RootFrame
-from datetime import datetime
 import bs4
 import sys
 import os

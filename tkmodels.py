@@ -242,6 +242,9 @@ class RootFrame(Tk):
         datetime_process_start = datetime.now()
         self.console("process started @ %s" % datetime_process_start)
         self.console("waiting for verified paths...")
+        self.alert_action_symbol("v%s" % utils.get_version())
+        self.alert_action_info("[Error]: no valid playlist selected", bg=c.COLOR_RED)
+
 
 class RootSplashFrame(StyledTopLevel):
     def __init__(self, parent, **kwargs):
@@ -521,9 +524,6 @@ class RootMainFrame(StyledFrame):
             self.group_collection,
             width=40,
         )
-        #TODO: change default path
-        self.entry_collection_path.insert(0, "Path/to/default/dir/here")
-
         self.browser_playlist_path= tkinter.Button(
             self.group_playlist,
             text="Browse",
@@ -648,35 +648,57 @@ class RootMainFrame(StyledFrame):
 
     def track_path_entries(self):
         map_tracked_entries = {
-            'directories': [
-                self.entry_collection_path
-            ],
-            'playlists': [
-                self.entry_playlist_path
-            ]
+            'collection': {
+                'widget': self.entry_collection_path,
+                'verified': lambda path: os.path.isdir(path),
+                'set': False,
+                'last': ""
+            },
+            'playlist': {
+                'widget': self.entry_playlist_path,
+                'verified': lambda path: self.verify_path_playlist(path),
+                'set': False,
+                'last': ""
+            }
         }
-        map_path_verifications = {
-            'directories': lambda path: os.path.isdir(path),
-            'playlists': lambda path: self.verify_path_playlist(path)
-        }
+        for _type, entry in map_tracked_entries.items():
+            widget = entry['widget']
+            verified = entry['verified'](widget.get())
+            last = entry['last']
+            if verified:
+                widget.config(bg=c.COLOR_GREEN)
+                map_tracked_entries[_type].update(set=True)
+                if _type == 'playlist':
+                    if not map_tracked_entries['collection'].get('set'):
+                        self.set_collection_entry(os.path.dirname(widget.get()))
+            else:
+                widget.config(bg=c.COLOR_RED)
+                map_tracked_entries[_type].update(set=False)
 
-        try:
-            for _type, entry_list in map_tracked_entries.items():
-                path_verified = map_path_verifications[_type]
-                for entry in entry_list:
-                    if path_verified(entry.get()):
-                        entry.config(bg=c.COLOR_GREEN)
-                    else:
-                        entry.config(bg=c.COLOR_RED)
+        if map_tracked_entries['playlist'].get('set') and map_tracked_entries['collection'].get('set'):
+            self.btn_close.config(
+                state=tkc.NORMAL,
+                bg=c.COLOR_GREEN
+            )
+        else:
+            self.btn_close.config(
+                state=tkc.DISABLED,
+                bg=c.COLOR_CHARCOAL
+            )
 
-            self.root.after(10, self.track_path_entries)
-        except Exception as e:
-            print(e)
-            #TODO: add error message in footer rather than close
-            self.root.after_cancel(self.track_path_entries)
+        self.root.after(50, self.track_path_entries)
+
 
     def track_console_output(self):
         pass
+
+    def set_collection_entry(self, path):
+        self.entry_collection_path.delete(0, tkc.END)
+        self.entry_collection_path.insert(0, path)
+
+    def set_playlist_entry(self, path):
+        self.entry_playlist_path.delete(0, tkc.END)
+        self.entry_playlist_path.insert(0, path)
 
 
 class RootFooterFrame(StyledFrame):

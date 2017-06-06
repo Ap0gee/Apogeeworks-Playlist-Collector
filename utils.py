@@ -15,3 +15,9 @@ def tk_get_root(current_frame):
         except:
             return None
     return is_root(current_frame)
+
+def get_version(version=None):
+    if version is None:
+        from apc import VERSION as version
+
+    return '.'.join(str(x) for x in version)
