@@ -7,6 +7,7 @@ from tkinter import filedialog
 import constants as c
 import tkinter.constants as tkc
 from datetime import datetime
+from apcollections import Collector
 import random
 import utils
 import os
@@ -269,6 +270,9 @@ class RootFrame(Tk):
         self.alert_action_symbol('v%s' % utils.get_version())
         self.alert_action_info(self.get_tip(c.TIP_BROWSE), fg=c.COLOR_DARK_KNIGHT)
 
+    def collect_media(self, path_playlist, dir_target):
+        media_collector = Collector(path_playlist, dir_target)
+        media_collector.collect()
 
 class RootSplashFrame(StyledTopLevel):
     def __init__(self, parent, **kwargs):
@@ -613,7 +617,7 @@ class RootMainFrame(StyledFrame):
             variable=self.var_console_text_size,
             command=self.set_console_text_size,
         )
-        self.btn_close_label = tkinter.Label(
+        self.btn_start_label = tkinter.Label(
             self.control_panel,
             text="",
             font=utils.tk_font(),
@@ -621,7 +625,7 @@ class RootMainFrame(StyledFrame):
             bg=c.COLOR_LIGHT_GREY,
             relief=tkc.FLAT,
         )
-        self.btn_close = tkinter.Button(
+        self.btn_start = tkinter.Button(
             self.control_panel,
             text="START",
             font=utils.tk_font(),
@@ -629,7 +633,10 @@ class RootMainFrame(StyledFrame):
             bg=c.COLOR_GREEN,
             fg=c.COLOR_WHITE,
             relief=tkc.FLAT,
-            command=None
+            command=lambda: self.root.collect_media(
+                self.map_tracked_entries['playlist'].get('last'),
+                self.map_tracked_entries['collection'].get('last')
+            )
         )
         self.pack(
         )
@@ -645,7 +652,7 @@ class RootMainFrame(StyledFrame):
         )
         self.entry_playlist_path.grid(
             row=0, column=1,
-            padx=(37, 0), pady=(0, 5)
+            padx=(37, 0), pady=(0, 3)
         )
         self.browser_playlist_path.grid(
             row=0, column=2,
@@ -661,7 +668,7 @@ class RootMainFrame(StyledFrame):
         )
         self.entry_collection_path.grid(
             row=0, column=1,
-            padx=(7, 0), pady=(0, 5)
+            padx=(7, 0), pady=(0, 3)
         )
         self.browser_collection_path.grid(
             row=0, column=2,
@@ -679,7 +686,7 @@ class RootMainFrame(StyledFrame):
         self.scale_console_text.place(
             x=12, y=270
         )
-        self.btn_close.place(
+        self.btn_start.place(
             x=320, y=273
         )
         self.grid(
@@ -753,7 +760,7 @@ class RootMainFrame(StyledFrame):
                 browser.config(text='Browse')
 
         if is_set_playlist and is_set_collection:
-            self.btn_close.config(
+            self.btn_start.config(
                 state=tkc.NORMAL,
                 bg=c.COLOR_GREEN
             )
@@ -762,7 +769,7 @@ class RootMainFrame(StyledFrame):
                 self.root.alert_action_info(self.root.get_tip(c.TIP_START), fg=c.COLOR_DARK_KNIGHT)
                 self.state_ready_collect = c.STATE_READY
         else:
-            self.btn_close.config(
+            self.btn_start.config(
                 state=tkc.DISABLED,
                 bg=c.COLOR_CHARCOAL
             )
