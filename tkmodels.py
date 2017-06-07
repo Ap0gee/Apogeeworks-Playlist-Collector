@@ -66,6 +66,7 @@ class SizedTextBox(tkinter.Frame):
             highlightbackground=c.COLOR_WHITE,
             highlightcolor=c.COLOR_BLUE,
             highlightthickness=0,
+            width=20,
             wrap=tkc.CHAR,
             state=tkc.DISABLED,
             spacing3=5
@@ -75,11 +76,14 @@ class SizedTextBox(tkinter.Frame):
             command=self.widget.yview
         )
         sb_y.pack(
-            in_=self.widget, side=tkc.RIGHT, fill=tkc.Y
+            in_=self, side=tkc.RIGHT, fill=tkc.Y
         )
         self.widget['yscroll'] = sb_y.set
 
-        self.widget.pack(expand=tkc.YES, fill=tkc.BOTH)
+        self.widget.pack(
+            expand=tkc.YES,
+            fill=tkc.BOTH
+        )
 
     def pack(self, *args, **kwargs):
         tkinter.Frame.pack(self, *args, **kwargs)
@@ -501,6 +505,9 @@ class RootMainFrame(StyledFrame):
     def __init__(self, parent, **kwargs):
         StyledFrame.__init__(self, parent, **kwargs)
 
+        self.var_console_text_size = tkinter.IntVar()
+        self.var_console_text_size.set(9)
+
         self.init_ui()
 
         self.map_tracked_entries = {
@@ -596,6 +603,16 @@ class RootMainFrame(StyledFrame):
             self.group_console,
             height=100,
         )
+        self.scale_console_text = tkinter.Scale(
+            self,
+            from_=8, to=14,
+            resolution=2,
+            orient=tkc.HORIZONTAL,
+            showvalue=False,
+            highlightbackground=c.COLOR_BLUE,
+            variable=self.var_console_text_size,
+            command=self.set_console_text_size,
+        )
         self.btn_close_label = tkinter.Label(
             self.control_panel,
             text="",
@@ -658,6 +675,9 @@ class RootMainFrame(StyledFrame):
             fill=tkc.X,
             pady=(0, 5),
             padx=(5, 5)
+        )
+        self.scale_console_text.place(
+            x=12, y=270
         )
         self.btn_close.place(
             x=320, y=273
@@ -763,6 +783,11 @@ class RootMainFrame(StyledFrame):
     def set_playlist_entry(self, path):
         self.entry_playlist_path.delete(0, tkc.END)
         self.entry_playlist_path.insert(0, path)
+
+    def set_console_text_size(self, event):
+        self.textbox_console_output.config(
+            font=utils.tk_font(size=self.var_console_text_size.get())
+        )
 
 
 class RootFooterFrame(StyledFrame):
