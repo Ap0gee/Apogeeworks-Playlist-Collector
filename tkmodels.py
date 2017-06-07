@@ -7,6 +7,7 @@ from tkinter import filedialog
 import constants as c
 import tkinter.constants as tkc
 from datetime import datetime
+import random
 import utils
 import os
 import sys
@@ -53,18 +54,21 @@ class StyledTopLevel(tkinter.Toplevel):
         pass
 
 
-class SizedListBox(tkinter.Frame):
+class SizedTextBox(tkinter.Frame):
     def __init__(self, master, width=0, height=0, **kwargs):
         self.width = width
         self.height = height
         tkinter.Frame.__init__(self, master, width=self.width, height=self.height)
 
-        self.widget = tkinter.Listbox(
+        self.widget = tkinter.Text(
             self,
             font=utils.tk_font(size=10),
             highlightbackground=c.COLOR_WHITE,
             highlightcolor=c.COLOR_BLUE,
             highlightthickness=0,
+            wrap=tkc.CHAR,
+            state=tkc.DISABLED,
+            spacing3=5
         )
         sb_y = ttk.Scrollbar(
             orient=tkc.VERTICAL,
@@ -135,6 +139,20 @@ class RootFrame(Tk):
             81: self.destroy,  # "<Alt-q>"
         }
 
+        self.tip_map = {
+            c.TIP_BROWSE: 'Browse for and select your paths.',
+            c.TIP_START: 'Press the "Start" button to begin!',
+            c.TIP_RANDOM: [
+                'You can disable these tips in "Options" > "Configure"',
+                '',
+                ''
+            ],
+            c.TIP_LAST: ''
+        }
+
+        self.error_map = {
+        }
+
         self.track_events()
         self.on_start()
 
@@ -147,7 +165,6 @@ class RootFrame(Tk):
             width=self.w,
             height=self.h
         )
-
         center_x, center_y = self.center_frame()
         self.geometry(
             '%dx%d+%d+%d' % (self.w, self.h, center_x, center_y)
@@ -221,15 +238,32 @@ class RootFrame(Tk):
     def alert_action_symbol(self, text, fg="white", bg=c.COLOR_BLUE):
         self.frame_footer.label_action_symbol.config(fg=fg, bg=bg, text=text)
 
-    def console(self, msg):
-        self.frame_main.console(msg)
+    def get_tip(self, tip):
+        format_tip = '[Tip]: %s'
+        if not tip is c.TIP_RANDOM:
+            return format_tip % self.tip_map[tip]
+
+        list_tips = self.tip_map[tip]
+        return format_tip % random.choice(list_tips)
+
+    def get_error(self, err):
+        pass
+
+    def console(self, msg, prefix=" >> ", end="\n", tag='', tag_start='insert-1c', tag_end='insert lineend+1c'):
+        self.frame_main.console(
+            msg,
+            prefix=prefix,
+            end=end,
+            tag=tag,
+            tag_start=tag_start,
+            tag_end=tag_end,
+        )
 
     def on_start(self):
-        datetime_process_start = datetime.now()
-        self.console("process started @ %s" % datetime_process_start)
-        self.console("waiting for verified paths...")
-        self.alert_action_symbol("v%s" % utils.get_version())
-        self.alert_action_info("[Error]: no valid playlist selected", bg=c.COLOR_RED)
+        self.console('process started')
+        self.console('not ready', tag=c.TAG_TEXT_RED)
+        self.alert_action_symbol('v%s' % utils.get_version())
+        self.alert_action_info(self.get_tip(c.TIP_BROWSE), fg=c.COLOR_DARK_KNIGHT)
 
 
 class RootSplashFrame(StyledTopLevel):
@@ -374,7 +408,7 @@ class RootToolFrame(StyledFrame):
         new_x = root_x + delta_x
         new_y = root_y + delta_y
 
-        self.parent.geometry("+%s+%s" % (new_x, new_y))
+        self.parent.geometry('+%s+%s' % (new_x, new_y))
 
 
 class RootMenuFrame(StyledFrame):
@@ -474,17 +508,30 @@ class RootMainFrame(StyledFrame):
                 'widget': self.entry_collection_path,
                 'verified': lambda path: os.path.isdir(path),
                 'set': False,
-                'last': "",
+                'last': None,
                 'browser': self.browser_collection_path
             },
             'playlist': {
                 'widget': self.entry_playlist_path,
                 'verified': lambda path: self.verify_path_playlist(path),
                 'set': False,
-                'last': "",
+                'last': None,
                 'browser': self.browser_playlist_path
             }
         }
+
+        self.state_ready_collect = c.STATE_NOT_READY
+
+        self.textbox_console_output.tag_configure(
+            c.TAG_TEXT_RED, foreground=c.COLOR_RED
+        )
+        self.textbox_console_output.tag_configure(
+            c.TAG_TEXT_GREEN, foreground=c.COLOR_GREEN
+        )
+        self.textbox_console_output.tag_configure(
+            c.TAG_TEXT_ORANGE, foreground=c.COLOR_ORANGE
+        )
+
         self.track_path_entries()
         self.track_console_output()
 
@@ -526,7 +573,7 @@ class RootMainFrame(StyledFrame):
             self.group_collection,
             width=40,
         )
-        self.browser_playlist_path= tkinter.Button(
+        self.browser_playlist_path = tkinter.Button(
             self.group_playlist,
             text="Change",
             width=6, height=1,
@@ -545,7 +592,7 @@ class RootMainFrame(StyledFrame):
             font=utils.tk_font(size=10, weight=c.FONT_WEIGHT_BOLD),
             text="Console Output",
         )
-        self.listbox_console_output = SizedListBox(
+        self.textbox_console_output = SizedTextBox(
             self.group_console,
             height=100,
         )
@@ -607,7 +654,7 @@ class RootMainFrame(StyledFrame):
             fill=tkc.X,
             pady=(15, 0)
         )
-        self.listbox_console_output = self.listbox_console_output.pack(
+        self.textbox_console_output = self.textbox_console_output.pack(
             fill=tkc.X,
             pady=(0, 5),
             padx=(5, 5)
@@ -625,14 +672,14 @@ class RootMainFrame(StyledFrame):
     def open_file(self, tk_entry):
         path = filedialog.askopenfilename()
 
-        if not path is "":
+        if not path is '':
             tk_entry.delete(0, tkc.END)
             tk_entry.insert(0, path)
 
     def open_directory(self, tk_entry):
         path = filedialog.askdirectory()
 
-        if not path is "":
+        if not path is '':
             tk_entry.delete(0, tkc.END)
             tk_entry.insert(0, path)
 
@@ -640,42 +687,69 @@ class RootMainFrame(StyledFrame):
         file_name, ext = os.path.splitext(path)
         return os.path.exists(path) and ext == '.wpl'
 
-    def console(self, msg):
-        self.listbox_console_output.insert(tkc.END, msg)
-        self.listbox_console_output.selection_clear(0, tkc.END)
-        self.listbox_console_output.see(tkc.END)
+    def console(self, msg, prefix=" >> ", end="\n", tag='', tag_start='insert-1c', tag_end='insert lineend+1c'):
+        now = "[{}]".format(datetime.now().strftime("%Y/%m/%d - %H:%M:%S"))
+        self.textbox_console_output.tag_add(tag, tag_start, tag_end)
+        self.textbox_console_output.config(state=tkc.NORMAL)
+        self.textbox_console_output.insert(tkc.END, now + prefix + msg + end)
+        self.textbox_console_output.see(tkc.END)
+        self.textbox_console_output.config(state=tkc.DISABLED)
+        self.textbox_console_output.tag_remove(tag, 'insert lineend-1c')
+        self.update_idletasks()
 
     def track_path_entries(self):
+        is_set_playlist = self.map_tracked_entries['playlist'].get('set')
+        is_set_collection = self.map_tracked_entries['collection'].get('set')
+
         for _type, entry in self.map_tracked_entries.items():
             widget = entry.get('widget')
             verified = entry.get('verified')(widget.get())
             last = entry.get('last')
             browser = entry.get('browser')
+            msg_path_state = '%s path verified @ "%s"'
+
             if verified:
                 widget.config(bg=c.COLOR_GREEN)
                 entry.update(set=True)
-                browser.config(text="Change")
+                browser.config(text='Change')
+
                 if _type == 'playlist':
                     path_playlist = widget.get()
                     if last != path_playlist:
+                        self.console(msg_path_state % (_type, path_playlist))
                         dir_playlist = os.path.dirname(path_playlist)
-                        self.set_collection_entry(dir_playlist)
+                        if not is_set_collection:
+                            self.set_collection_entry(dir_playlist)
                         entry.update(last=path_playlist)
+
+                elif _type == 'collection':
+                    dir_collection = widget.get()
+                    if last != dir_collection:
+                        self.console(msg_path_state % (_type, dir_collection))
+                        entry.update(last=dir_collection)
             else:
                 widget.config(bg=c.COLOR_RED)
                 entry.update(set=False)
-                browser.config(text="Browse")
+                browser.config(text='Browse')
 
-        if self.map_tracked_entries['playlist'].get('set') and self.map_tracked_entries['collection'].get('set'):
+        if is_set_playlist and is_set_collection:
             self.btn_close.config(
                 state=tkc.NORMAL,
                 bg=c.COLOR_GREEN
             )
+            if self.state_ready_collect != c.STATE_READY:
+                self.console("ready!", tag=c.TAG_TEXT_GREEN)
+                self.root.alert_action_info(self.root.get_tip(c.TIP_START), fg=c.COLOR_DARK_KNIGHT)
+                self.state_ready_collect = c.STATE_READY
         else:
             self.btn_close.config(
                 state=tkc.DISABLED,
                 bg=c.COLOR_CHARCOAL
             )
+            if self.state_ready_collect != c.STATE_NOT_READY:
+                self.console('not ready', tag=c.TAG_TEXT_RED)
+                self.root.alert_action_info(self.root.get_tip(c.TIP_BROWSE), fg=c.COLOR_DARK_KNIGHT)
+                self.state_ready_collect = c.STATE_NOT_READY
 
         self.root.after(100, self.track_path_entries)
 
