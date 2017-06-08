@@ -10,18 +10,8 @@ from datetime import datetime
 from apcollections import Collector
 import random
 import utils
+import settings
 import os
-import sys
-
-
-if hasattr(sys, 'frozen'):
-    DIR_BASE = os.path.abspath(os.path.dirname(sys.executable))
-else:
-    DIR_BASE = os.path.abspath(os.path.dirname(__file__))
-
-DIR_ASSETS = os.path.join(DIR_BASE, 'assets')
-DIR_IMAGES = os.path.join(DIR_ASSETS, 'images')
-DIR_CURSORS = os.path.join(DIR_ASSETS, 'cursors')
 
 
 class StyledFrame(tkinter.Frame):
@@ -70,7 +60,8 @@ class SizedTextBox(tkinter.Frame):
             width=20,
             wrap=tkc.CHAR,
             state=tkc.DISABLED,
-            spacing3=5
+            spacing3=5,
+            cursor=c.CURSOR_ARROW
         )
         sb_y = ttk.Scrollbar(
             orient=tkc.VERTICAL,
@@ -120,15 +111,15 @@ class RootFrame(Tk):
         )
 
         # self.bind_all("<Key>", self.track_keys)
-        self.bind_all("<Control-l>", self.track_keys)
-        self.bind_all("<Control-e>", self.track_keys)
-        self.bind_all("<Control-k>", self.track_keys)
-        self.bind_all("<Control-d>", self.track_keys)
-        self.bind_all("<Control-m>", self.track_keys)
-        self.bind_all("<Control-n>", self.track_keys)
-        self.bind_all("<Control-s>", self.track_keys)
-        self.bind_all("<Alt-i>", self.track_keys)
-        self.bind_all("<Alt-x>", self.track_keys)
+        #self.bind_all("<Control-l>", self.track_keys)
+        #self.bind_all("<Control-e>", self.track_keys)
+        #self.bind_all("<Control-k>", self.track_keys)
+        #self.bind_all("<Control-d>", self.track_keys)
+        #self.bind_all("<Control-m>", self.track_keys)
+        #self.bind_all("<Control-n>", self.track_keys)
+        #self.bind_all("<Control-s>", self.track_keys)
+        #self.bind_all("<Alt-i>", self.track_keys)
+        #self.bind_all("<Alt-x>", self.track_keys)
         self.bind_all("<Alt-q>", self.track_keys)
 
         self.key_map = {
@@ -286,7 +277,7 @@ class RootSplashFrame(StyledTopLevel):
         center_x, center_y = self.root.center_frame()
         #TODO: fix image size
         self.image_logo = tkinter.PhotoImage(
-            file=os.path.join(DIR_IMAGES, "logo_apogeeworks.gif")
+            file=os.path.join(settings.DIR_IMAGES, "logo_apogeeworks.gif")
         )
         self.canvas_logo = tkinter.Canvas(
             master=self,
@@ -509,6 +500,10 @@ class RootMainFrame(StyledFrame):
 
         self.var_console_text_size = tkinter.IntVar()
         self.var_console_text_size.set(9)
+        self.var_media_found_total = tkinter.IntVar()
+        self.var_media_lost_total = tkinter.IntVar()
+
+        self.state_ready_collect = c.STATE_NOT_READY
 
         self.init_ui()
 
@@ -528,9 +523,9 @@ class RootMainFrame(StyledFrame):
                 'browser': self.browser_playlist_path
             }
         }
-
-        self.state_ready_collect = c.STATE_NOT_READY
-
+        self.textbox_console_output.bindtags(
+            (self.textbox_console_output, self.textbox_console_output, "all")
+        )
         self.textbox_console_output.tag_configure(
             c.TAG_TEXT_RED, foreground=c.COLOR_RED
         )
@@ -591,14 +586,14 @@ class RootMainFrame(StyledFrame):
             text="Change",
             width=6, height=1,
             relief=tkc.RAISED,
-            command=lambda: self.open_file(self.entry_playlist_path)
+            command=lambda: self.browse_file(self.entry_playlist_path)
         )
         self.browser_collection_path = tkinter.Button(
             self.group_collection,
             text="Change",
             width=6, height=1,
             relief=tkc.RAISED,
-            command=lambda: self.open_directory(self.entry_collection_path)
+            command=lambda: self.browse_directory(self.entry_collection_path)
         )
         self.group_console = tkinter.LabelFrame(
             self.control_panel,
@@ -688,6 +683,9 @@ class RootMainFrame(StyledFrame):
         self.scale_console_text.place(
             x=12, y=270
         )
+
+
+
         self.btn_start.place(
             x=320, y=273
         )
@@ -698,14 +696,14 @@ class RootMainFrame(StyledFrame):
 
         self.update()
 
-    def open_file(self, tk_entry):
+    def browse_file(self, tk_entry):
         path = filedialog.askopenfilename()
 
         if not path is '':
             tk_entry.delete(0, tkc.END)
             tk_entry.insert(0, path)
 
-    def open_directory(self, tk_entry):
+    def browse_directory(self, tk_entry):
         path = filedialog.askdirectory()
 
         if not path is '':
@@ -721,8 +719,8 @@ class RootMainFrame(StyledFrame):
         self.textbox_console_output.tag_add(tag, tag_start, tag_end)
         self.textbox_console_output.config(state=tkc.NORMAL)
         self.textbox_console_output.insert(tkc.END, now + prefix + msg + end)
-        self.textbox_console_output.see(tkc.END)
         self.textbox_console_output.config(state=tkc.DISABLED)
+        self.textbox_console_output.see(tkc.END)
         self.textbox_console_output.tag_remove(tag, 'insert lineend-1c')
         self.update_idletasks()
 

@@ -2,15 +2,15 @@
 
 __author__ = 'Apogee'
 
-from tkmodels import RootFrame
-from utils import get_version
+import tkmodels
+import utils
 
 VERSION = (0, 1, 0)
 
-__version__ = get_version(VERSION)
+__version__ = utils.get_version(VERSION)
 
 def main():
-    root = RootFrame(None)
+    root = tkmodels.RootFrame(None)
     root.mainloop()
 
 if __name__ == '__main__':
