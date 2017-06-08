@@ -2,6 +2,7 @@ __author__ = 'Apogee'
 
 import tkinter.constants as tkc
 import constants as c
+import sys
 
 def tk_font(family="Helvetica", size=12, weight="normal"):
     return (family, size, weight)
@@ -21,3 +22,10 @@ def get_version(version=None):
         from apc import VERSION as version
 
     return '.'.join(str(x) for x in version)
+
+def write_to_file(self, data, file, mode='w'):
+    try:
+        with open(file, mode) as f:
+            f.write(data)
+    except IOError:
+        sys.exit(c.EXIT_CODE_ERROR)

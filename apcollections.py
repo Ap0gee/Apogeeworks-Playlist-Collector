@@ -1,24 +1,28 @@
 __author__ = 'Apogee'
 
-from shutil import copyfile
+import tkinter.constants as tkc
 import constants as c
+import _thread
+import time
+import shutil
 import bs4
 import sys
 import os
 
-EXIT_CODE_OK = 0
-EXIT_CODE_ERROR = 1
 
 class Collector():
-    def __init__(self, file, dir_target):
-        self.verify_file(file)
+    def __init__(self, tk_root, file, dir_target):
+
         self.path_file = os.path.realpath(file)
-        self.file_name = os.path.basename(self.path_file)
+        self.file_name_full = os.path.basename(self.path_file)
+        self.file_name, self.file_ext = self.get_path_split(self.file_name_full)
         self.dir_root = os.path.dirname(self.path_file)
         self.dir_base = os.path.dirname(self.dir_root)
+        self.dir_target = os.path.join(dir_target, self.file_name)
+
         self.media_found = list()
         self.media_lost = list()
-        self.dir_target = dir_target
+
         self.accepted_media_exts = [
             '.cda', '.ivf', '.aif', '.aifc', '.aiff' '.asf', '.asx', '.wax', '.wm',
             '.wma', '.wmd', '.wmv', '.wvx', '.wmp', '.wmx', '.avi', '.wav',
@@ -26,19 +30,15 @@ class Collector():
             '.mid', '.midi', '.rmi', '.au',  '.snd', '.mp3', '.m3u', '.vob'
         ]
 
+        self.root = tk_root
+
     @property
     def raw_data(self):
         try:
             with open(self.path_file, 'r') as f:
                 return f.read().replace('\n', '')
         except IOError:
-            sys.exit(EXIT_CODE_ERROR)
-
-    @classmethod
-    def verify_file(cls, file):
-        if os.path.exists(file) & os.path.isfile(file):
-            return True
-        raise FileNotFoundError
+            sys.exit(c.EXIT_CODE_ERROR)
 
     def as_html(self):
         raw_data = str(self.raw_data)
@@ -56,45 +56,61 @@ class Collector():
 
         return raw_data
 
-    def write_to_file(self, data, file):
-        self.verify_file(file)
-        try:
-            with open(file, 'w') as f:
-                f.write(data)
-        except IOError:
-            sys.exit(EXIT_CODE_ERROR)
+    def get_path_split(self, path, get_filename=True, get_ext=True):
+        file_name, ext = os.path.splitext(path)
+
+        if get_filename and get_ext or not get_filename and not get_ext:
+            return (file_name, ext)
+        elif get_filename and not get_ext:
+            return file_name
+        else:
+            return ext
 
     def get_source_file_paths(self):
         html_data = self.as_html()
         soup = bs4.BeautifulSoup(html_data, 'html.parser')
-        list_src = [str(media['src']).encode(c.ENCODING_WPL) for media in soup.find_all('source')]
+        list_src = [
+            str(media['src']).encode(c.ENCODING_WPL) for media in soup.find_all('source')
+        ]
         return list_src
 
-    def gather_media_at(self, target_dir):
-        #TODO remove possibility of duplicate tracks
-        _file_name_full = os.path.basename(target_dir)
-        _file_name, _ext = os.path.splitext(_file_name_full)
-        dir_media_target = os.path.join(target_dir, _file_name)
-        if not os.path.isdir(dir_media_target):
-            os.mkdir(dir_media_target)
+    def __collect(self, callback=None):
+        if not os.path.isdir(self.dir_target):
+            try:
+                os.mkdir(self.dir_target)
+            except Exception:
+                raise FileExistsError
 
-        for path in self.get_source_file_paths():
-            if os.path.exists(path):
-                self.media_found.append(path)
-                file_name_full = os.path.basename(str(path.decode('utf-8')))
-                file_name, ext = os.path.splitext(file_name_full)
+        for path_source in self.get_source_file_paths():
 
-                if ext in self.accepted_media_exts:
-                    path_target_full = os.path.join(target_dir, file_name_full)
-                    copyfile(path, path_target_full)
+            media_name_full = os.path.basename(str(path_source.decode('utf-8')))
+            media_name, media_ext = self.get_path_split(media_name_full)
+            path_media_target_full = os.path.join(self.dir_target, media_name_full)
+
+            if os.path.exists(path_source):
+                if path_source not in self.media_found and media_ext in self.accepted_media_exts:
+                    self.media_found.append(path_source)
+                    try:
+                        shutil.copyfile(path_source, path_media_target_full)
+                        console_tag = c.TAG_TEXT_BLUE
+                    except shutil.Error:
+                        self.media_lost.append(path_source)
+                        console_tag = c.TAG_TEXT_RED
                 else:
-                    self.media_lost.append(path)
+                    self.media_lost.append(path_source)
+                    console_tag = c.TAG_TEXT_RED
             else:
-                self.media_lost.append(path)
+                self.media_lost.append(path_source)
+                console_tag = c.TAG_TEXT_RED
 
-    def collect(self):
-        print("collecting data from %s @ %s" % (self.file_name, self.dir_target))
-        self.gather_media_at(self.dir_target)
-        print("total media gathered: %s" % len(self.media_found))
-        print("total media lost: %s" % len(self.media_lost))
-        print("lost media: %s" % self.media_lost)
+            self.root.console(path_media_target_full, tag=console_tag)
+
+        if callback:
+            callback()
+
+    def collect(self, callback=None):
+        _thread.start_new_thread(self.__collect, (callback,))
+
+
+
+

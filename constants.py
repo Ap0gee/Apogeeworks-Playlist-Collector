@@ -1,5 +1,7 @@
 __author__ = 'Apogee'
 
+EXIT_CODE_OK = 0
+EXIT_CODE_ERROR = 1
 ENCODING_WPL = 'cp1252'
 CURSOR_HAND_1 = 'hand1'
 CURSOR_HAND_2 = 'hand2'
@@ -18,6 +20,7 @@ STATE_DOWN = 'down'
 STATE_ATTACHED = 'attached'
 STATE_DETACHED = 'detached'
 STATE_READY = 'ready'
+STATE_COLLECTING = 'collecting'
 STATE_NOT_READY = 'not_ready'
 ACTION_ADD = 'add'
 ACTION_REMOVE = 'remove'
@@ -36,6 +39,7 @@ COLOR_PURPLE = "purple"
 TAG_TEXT_RED = 'tag_text_red'
 TAG_TEXT_GREEN = 'tag_text_green'
 TAG_TEXT_ORANGE = 'tag_text_orange'
+TAG_TEXT_BLUE = 'tag_text_blue'
 TIP_BROWSE = 'tip_browse'
 TIP_START = 'tip_start'
 TIP_RANDOM = 'tip_random'

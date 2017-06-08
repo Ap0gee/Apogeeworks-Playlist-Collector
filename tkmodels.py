@@ -150,7 +150,6 @@ class RootFrame(Tk):
             c.TIP_RANDOM: [
                 'You can disable these tips in "Options" > "Configure"',
                 '',
-                ''
             ],
             c.TIP_LAST: ''
         }
@@ -246,10 +245,12 @@ class RootFrame(Tk):
     def get_tip(self, tip):
         format_tip = '[Tip]: %s'
         if not tip is c.TIP_RANDOM:
-            return format_tip % self.tip_map[tip]
+            self.tip_map.update(last=self.tip_map[tip])
+            return format_tip % self.tip_map.get('last')
 
         list_tips = self.tip_map[tip]
-        return format_tip % random.choice(list_tips)
+        self.tip_map.update(last=random.choice(list_tips))
+        return format_tip % self.tip_map.get('last')
 
     def get_error(self, err):
         pass
@@ -270,9 +271,6 @@ class RootFrame(Tk):
         self.alert_action_symbol('v%s' % utils.get_version())
         self.alert_action_info(self.get_tip(c.TIP_BROWSE), fg=c.COLOR_DARK_KNIGHT)
 
-    def collect_media(self, path_playlist, dir_target):
-        media_collector = Collector(path_playlist, dir_target)
-        media_collector.collect()
 
 class RootSplashFrame(StyledTopLevel):
     def __init__(self, parent, **kwargs):
@@ -542,9 +540,13 @@ class RootMainFrame(StyledFrame):
         self.textbox_console_output.tag_configure(
             c.TAG_TEXT_ORANGE, foreground=c.COLOR_ORANGE
         )
+        self.textbox_console_output.tag_configure(
+            c.TAG_TEXT_BLUE, foreground=c.COLOR_BLUE
+        )
 
         self.track_path_entries()
         self.track_console_output()
+        self.track_collection_state()
 
     def init_ui(self):
         self.config(
@@ -633,7 +635,7 @@ class RootMainFrame(StyledFrame):
             bg=c.COLOR_GREEN,
             fg=c.COLOR_WHITE,
             relief=tkc.FLAT,
-            command=lambda: self.root.collect_media(
+            command=lambda: self.collect_media(
                 self.map_tracked_entries['playlist'].get('last'),
                 self.map_tracked_entries['collection'].get('last')
             )
@@ -724,65 +726,6 @@ class RootMainFrame(StyledFrame):
         self.textbox_console_output.tag_remove(tag, 'insert lineend-1c')
         self.update_idletasks()
 
-    def track_path_entries(self):
-        is_set_playlist = self.map_tracked_entries['playlist'].get('set')
-        is_set_collection = self.map_tracked_entries['collection'].get('set')
-
-        for _type, entry in self.map_tracked_entries.items():
-            widget = entry.get('widget')
-            verified = entry.get('verified')(widget.get())
-            last = entry.get('last')
-            browser = entry.get('browser')
-            msg_path_state = '%s path verified @ "%s"'
-
-            if verified:
-                widget.config(bg=c.COLOR_GREEN)
-                entry.update(set=True)
-                browser.config(text='Change')
-
-                if _type == 'playlist':
-                    path_playlist = widget.get()
-                    if last != path_playlist:
-                        self.console(msg_path_state % (_type, path_playlist))
-                        dir_playlist = os.path.dirname(path_playlist)
-                        if not is_set_collection:
-                            self.set_collection_entry(dir_playlist)
-                        entry.update(last=path_playlist)
-
-                elif _type == 'collection':
-                    dir_collection = widget.get()
-                    if last != dir_collection:
-                        self.console(msg_path_state % (_type, dir_collection))
-                        entry.update(last=dir_collection)
-            else:
-                widget.config(bg=c.COLOR_RED)
-                entry.update(set=False)
-                browser.config(text='Browse')
-
-        if is_set_playlist and is_set_collection:
-            self.btn_start.config(
-                state=tkc.NORMAL,
-                bg=c.COLOR_GREEN
-            )
-            if self.state_ready_collect != c.STATE_READY:
-                self.console("ready!", tag=c.TAG_TEXT_GREEN)
-                self.root.alert_action_info(self.root.get_tip(c.TIP_START), fg=c.COLOR_DARK_KNIGHT)
-                self.state_ready_collect = c.STATE_READY
-        else:
-            self.btn_start.config(
-                state=tkc.DISABLED,
-                bg=c.COLOR_CHARCOAL
-            )
-            if self.state_ready_collect != c.STATE_NOT_READY:
-                self.console('not ready', tag=c.TAG_TEXT_RED)
-                self.root.alert_action_info(self.root.get_tip(c.TIP_BROWSE), fg=c.COLOR_DARK_KNIGHT)
-                self.state_ready_collect = c.STATE_NOT_READY
-
-        self.root.after(100, self.track_path_entries)
-
-    def track_console_output(self):
-        pass
-
     def set_collection_entry(self, path):
         self.entry_collection_path.delete(0, tkc.END)
         self.entry_collection_path.insert(0, path)
@@ -795,6 +738,101 @@ class RootMainFrame(StyledFrame):
         self.textbox_console_output.config(
             font=utils.tk_font(size=self.var_console_text_size.get())
         )
+
+    def set_tracked_entries_state(self, state=tkc.NORMAL):
+        for _type, entry in self.map_tracked_entries.items():
+            entry.get('widget').configure(state=state)
+            entry.get('browser').configure(state=state)
+
+    def on_done_collect_media(self):
+        self.set_tracked_entries_state(state=tkc.NORMAL)
+        self.state_ready_collect = c.STATE_READY
+        self.console("done!", tag=c.TAG_TEXT_GREEN)
+        #TODO: add logging
+        self.console("logs available @ ...", tag=c.TAG_TEXT_ORANGE)
+
+    def collect_media(self, path_playlist, dir_target):
+        self.state_ready_collect = c.STATE_COLLECTING
+        self.console("copying media...", tag=c.TAG_TEXT_ORANGE)
+        self.root.alert_action_info(self.root.get_tip(c.TIP_RANDOM))
+        media_collector = Collector(self.root, path_playlist, dir_target)
+        media_collector.collect(callback=self.on_done_collect_media)
+
+    def track_path_entries(self):
+        if not self.state_ready_collect == c.STATE_COLLECTING:
+
+            is_set_playlist = self.map_tracked_entries['playlist'].get('set')
+            is_set_collection = self.map_tracked_entries['collection'].get('set')
+
+            for _type, entry in self.map_tracked_entries.items():
+                widget = entry.get('widget')
+                verified = entry.get('verified')(widget.get())
+                last = entry.get('last')
+                browser = entry.get('browser')
+                msg_path_state = '%s path verified @ "%s"'
+
+                if verified:
+                    widget.config(bg=c.COLOR_GREEN)
+                    entry.update(set=True)
+                    browser.config(text='Change')
+
+                    if _type == 'playlist':
+                        path_playlist = widget.get()
+                        if last != path_playlist:
+                            self.console(msg_path_state % (_type, path_playlist))
+                            dir_playlist = os.path.dirname(path_playlist)
+                            if not is_set_collection:
+                                self.set_collection_entry(dir_playlist)
+                            entry.update(last=path_playlist)
+
+                    elif _type == 'collection':
+                        dir_collection = widget.get()
+                        if last != dir_collection:
+                            self.console(msg_path_state % (_type, dir_collection))
+                            entry.update(last=dir_collection)
+                else:
+                    widget.config(bg=c.COLOR_RED)
+                    entry.update(set=False)
+                    browser.config(text='Browse')
+
+            if is_set_playlist and is_set_collection:
+                if self.state_ready_collect != c.STATE_READY:
+                    self.console("ready!", tag=c.TAG_TEXT_GREEN)
+                    self.root.alert_action_info(self.root.get_tip(c.TIP_START), fg=c.COLOR_DARK_KNIGHT)
+                    self.state_ready_collect = c.STATE_READY
+            else:
+                if self.state_ready_collect != c.STATE_NOT_READY:
+                    self.console('not ready', tag=c.TAG_TEXT_RED)
+                    self.root.alert_action_info(self.root.get_tip(c.TIP_BROWSE), fg=c.COLOR_DARK_KNIGHT)
+                    self.state_ready_collect = c.STATE_NOT_READY
+
+        self.root.after(100, self.track_path_entries)
+
+    def track_collection_state(self):
+        btn_start_state = tkc.DISABLED
+        btn_start_color = c.COLOR_DARK_KNIGHT
+
+        if self.state_ready_collect == c.STATE_NOT_READY:
+            pass
+
+        elif self.state_ready_collect == c.STATE_READY:
+            btn_start_state = tkc.NORMAL
+            btn_start_color = c.COLOR_GREEN
+
+        elif self.state_ready_collect == c.STATE_COLLECTING:
+            self.set_tracked_entries_state(state=tkc.DISABLED)
+
+        self.btn_start.config(
+            state=btn_start_state,
+            bg=btn_start_color
+        )
+
+        #TODO: loading image
+
+        self.root.after(50, self.track_collection_state)
+
+    def track_console_output(self):
+        pass
 
 
 class RootFooterFrame(StyledFrame):
