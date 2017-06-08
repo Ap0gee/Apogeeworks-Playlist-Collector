@@ -236,7 +236,7 @@ class RootFrame(Tk):
     def track_events(self):
         self.after(50, self.track_events)
 
-    def alert_action_info(self, text, fg="white", bg=c.COLOR_ORANGE, font=utils.tk_font()):
+    def alert_action_info(self, text, fg=c.COLOR_DARK_KNIGHT, bg=c.COLOR_ORANGE, font=utils.tk_font(size=10)):
         self.frame_footer.label_action_info.config(fg=fg, bg=bg, font=font, text=text)
 
     def alert_action_symbol(self, text, fg="white", bg=c.COLOR_BLUE):
@@ -269,7 +269,7 @@ class RootFrame(Tk):
         self.console('process started')
         self.console('not ready', tag=c.TAG_TEXT_RED)
         self.alert_action_symbol('v%s' % utils.get_version())
-        self.alert_action_info(self.get_tip(c.TIP_BROWSE), fg=c.COLOR_DARK_KNIGHT)
+        self.alert_action_info(self.get_tip(c.TIP_BROWSE))
 
 
 class RootSplashFrame(StyledTopLevel):
@@ -798,12 +798,12 @@ class RootMainFrame(StyledFrame):
             if is_set_playlist and is_set_collection:
                 if self.state_ready_collect != c.STATE_READY:
                     self.console("ready!", tag=c.TAG_TEXT_GREEN)
-                    self.root.alert_action_info(self.root.get_tip(c.TIP_START), fg=c.COLOR_DARK_KNIGHT)
+                    self.root.alert_action_info(self.root.get_tip(c.TIP_START))
                     self.state_ready_collect = c.STATE_READY
             else:
                 if self.state_ready_collect != c.STATE_NOT_READY:
                     self.console('not ready', tag=c.TAG_TEXT_RED)
-                    self.root.alert_action_info(self.root.get_tip(c.TIP_BROWSE), fg=c.COLOR_DARK_KNIGHT)
+                    self.root.alert_action_info(self.root.get_tip(c.TIP_BROWSE))
                     self.state_ready_collect = c.STATE_NOT_READY
 
         self.root.after(100, self.track_path_entries)
