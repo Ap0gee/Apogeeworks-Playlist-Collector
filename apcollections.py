@@ -3,6 +3,7 @@ __author__ = 'Apogee'
 import tkinter.constants as tkc
 import constants as c
 import _thread
+import multiprocessing.pool
 import shutil
 import bs4
 import sys
@@ -31,13 +32,21 @@ class Collector():
 
         self.root = tk_root
 
-    @property
-    def raw_data(self):
+    def __raw_data(self):
         try:
             with open(self.path_file, 'r') as f:
                 return f.read().replace('\n', '')
         except IOError:
-            sys.exit(c.EXIT_CODE_ERROR)
+            msg_console = "%s: %s \n=> %s" % (
+                c.RESULT_FAILURE, self.path_file, self.root.get_error(c.ERROR_FILE_READ)
+            )
+            self.root.console(msg_console, tag=c.TAG_TEXT_RED)
+
+    @property
+    def raw_data(self):
+        async_pool = multiprocessing.pool.ThreadPool(processes=1)
+        async_result = async_pool.apply_async(self.__raw_data, ())
+        return async_result.get()
 
     def as_html(self):
         raw_data = str(self.raw_data)
@@ -74,7 +83,7 @@ class Collector():
         return list_src
 
     def __collect(self, callback=None):
-        if not os.path.isdir(self.dir_target):
+        if not os.path.exists(self.dir_target):
             try:
                 os.mkdir(self.dir_target)
             except Exception:
@@ -87,38 +96,45 @@ class Collector():
         frame_main.set_result_total(c.RESULT_TOTAL, list_source_files_total)
 
         for index, path_source in enumerate(list_source_files):
+
             path_source = str(path_source, 'utf-8')
             media_name_full = os.path.basename(path_source)
 
             media_name, media_ext = self.get_path_split(media_name_full)
             path_media_target_full = os.path.join(self.dir_target, media_name_full)
 
+            msg_failure_reason = None
+
             if os.path.exists(path_source):
-                if path_source not in self.media_found and media_ext in self.accepted_media_exts:
-                    self.media_found.append(path_source)
-                    try:
-                        shutil.copyfile(path_source, path_media_target_full)
-                    except shutil.Error as e:
-                        print(e)
-                        self.media_lost.append(path_source)
-                        console_tag = c.TAG_TEXT_RED
+                if path_source not in self.media_found:
+                    if media_ext in self.accepted_media_exts:
+                        try:
+                            shutil.copyfile(path_source, path_media_target_full)
+                        except shutil.Error:
+                            msg_failure_reason = self.root.get_error(c.ERROR_COPY_FAILED)
                     else:
-                        console_tag = c.TAG_TEXT_BLUE
-                        msg_failure_reason = None
+                        msg_failure_reason = self.root.get_error(c.ERROR_EXT_BAD)
                 else:
-                    self.media_lost.append(path_source)
-                    console_tag = c.TAG_TEXT_RED
-                    print("bad ext")
+                    msg_failure_reason = self.root.get_error(c.ERROR_DUPLICATE_MEDIA)
             else:
+                msg_failure_reason = self.root.get_error(c.ERROR_PATH_BAD)
+
+            if not msg_failure_reason:
+                tag_console = c.TAG_TEXT_BLUE
+                result_copy = c.RESULT_SUCCESS
+                self.media_found.append(path_source)
+                msg_console = "%s: %s" % (result_copy, path_source)
+            else:
+                tag_console = c.TAG_TEXT_RED
+                result_copy = c.RESULT_FAILURE
                 self.media_lost.append(path_source)
-                console_tag = c.TAG_TEXT_RED
-                print('bad path')
+                msg_console = "%s: %s \n=> %s" % (result_copy, path_source, msg_failure_reason)
 
             frame_main.set_progress_collection_attr(c.PB_SETTING_VALUE, index)
             frame_main.set_result_total(c.RESULT_SUCCESS, len(self.media_found))
             frame_main.set_result_total(c.RESULT_FAILURE, len(self.media_lost))
-            copy_result = c.RESULT_SUCCESS if not console_tag is c.TAG_TEXT_RED else c.RESULT_FAILURE
-            self.root.console("%s: %s" % (copy_result, path_source), tag=console_tag)
+
+            self.root.console(msg_console, tag=tag_console)
 
         if callback:
             callback()

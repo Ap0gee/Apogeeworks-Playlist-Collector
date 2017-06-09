@@ -110,8 +110,7 @@ class RootFrame(Tk):
         self.bind(
             "<Map>", self.bind_redirect
         )
-
-        # self.bind_all("<Key>", self.track_keys)
+        #self.bind_all("<Key>", self.track_keys)
         #self.bind_all("<Control-l>", self.track_keys)
         #self.bind_all("<Control-e>", self.track_keys)
         #self.bind_all("<Control-k>", self.track_keys)
@@ -124,37 +123,41 @@ class RootFrame(Tk):
         self.bind_all("<Alt-q>", self.track_keys)
 
         self.key_map = {
-            #     76: self.menu_frame.viewLoadGroup, #"<Control-l>"
-            #     75: self.menu_frame.askClearGroup, #"<Control-k>"
-            #     69: self.menu_frame.viewEditGroup, #"<Control-e>"
-            #     68: self.menu_frame.askDeleteGroup, #"<Control-d>"
-            #     78: self.menu_frame.viewNewGroup, #"<Control-n>"
-            #     77: self.menu_frame.viewDeleteMultipleGroup, #"<Control-m>"
-            #     83: self.summoned, #"<Control-s>"
-            #     73: self.destroy, #"<Alt-i>"
-            #     88: self.destroy, #"<Alt-x>"
-            81: self.kill,  # "<Alt-q>"
+            # 76: self.menu_frame.viewLoadGroup, #"<Control-l>"
+            # 75: self.menu_frame.askClearGroup, #"<Control-k>"
+            # 69: self.menu_frame.viewEditGroup, #"<Control-e>"
+            # 68: self.menu_frame.askDeleteGroup, #"<Control-d>"
+            # 78: self.menu_frame.viewNewGroup, #"<Control-n>"
+            # 77: self.menu_frame.viewDeleteMultipleGroup, #"<Control-m>"
+            # 83: self.summoned, #"<Control-s>"
+            # 73: self.destroy, #"<Alt-i>"
+            # 88: self.destroy, #"<Alt-x>"
+            81: self.kill, #"<Alt-q>"
         }
-
         self.tip_map = {
             c.TIP_BROWSE: 'Browse for and select your paths.',
             c.TIP_START: 'Press the "Start" button to begin!',
             c.TIP_RANDOM: [
-                'You can disable these tips in "Options" > "Configure"',
-                '',
+                'You can disable these tips in "Options" > "Configure".',
+                'You can exit quickly with the "Alt+Q" shortcut.',
             ],
             c.TIP_LAST: ''
         }
-
         self.error_map = {
+            c.ERROR_PATH_BAD: "Media at this location not found.",
+            c.ERROR_EXT_BAD: "Media type not supported.",
+            c.ERROR_COPY_FAILED: "Unable to copy media to destination.",
+            c.ERROR_DUPLICATE_MEDIA: "Media already exists in directory.",
+            c.ERROR_FILE_READ: "Unable to read file."
         }
-
         self.log = logging.getLogger(__name__)
         self.handler_log = logging.FileHandler(
             os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME),
             mode='w+'
         )
-        self.formatter_log = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+        self.formatter_log = logging.Formatter(
+            '%(asctime)s %(levelname)s %(message)s'
+        )
         self.handler_log.setFormatter(self.formatter_log)
         self.log.addHandler(self.handler_log)
         self.log.setLevel(logging.DEBUG)
@@ -238,11 +241,27 @@ class RootFrame(Tk):
     def track_events(self):
         self.after(50, self.track_events)
 
-    def alert_action_info(self, text, fg=c.COLOR_DARK_KNIGHT, bg=c.COLOR_ORANGE, font=utils.tk_font(size=10)):
-        self.frame_footer.label_action_info.config(fg=fg, bg=bg, font=font, text=text)
+    def alert_action_info(self, text, **kwargs):
+        fg = kwargs.get('fg', c.COLOR_DARK_KNIGHT)
+        bg = kwargs.get('bg', c.COLOR_ORANGE)
+        font = kwargs.get('font', utils.tk_font(size=10))
 
-    def alert_action_symbol(self, text, fg="white", bg=c.COLOR_BLUE):
-        self.frame_footer.label_action_symbol.config(fg=fg, bg=bg, text=text)
+        self.frame_footer.label_action_info.config(
+            text=text,
+            fg=fg,
+            bg=bg,
+            font=font,
+        )
+
+    def alert_action_symbol(self, text, **kwargs):
+        fg = kwargs.get('fg', c.COLOR_WHITE)
+        bg = kwargs.get('bg', c.COLOR_BLUE)
+
+        self.frame_footer.label_action_symbol.config(
+            text=text,
+            fg=fg,
+            bg=bg,
+        )
 
     def get_tip(self, tip):
         format_tip = '[Tip]: %s'
@@ -255,7 +274,7 @@ class RootFrame(Tk):
         return format_tip % self.tip_map.get('last')
 
     def get_error(self, err):
-        pass
+        return self.error_map[err]
 
     def console(self, msg, **kwargs):
         self.frame_main.console(msg, **kwargs)
@@ -876,6 +895,7 @@ class RootMainFrame(StyledFrame):
         map_result[result].set(value)
 
     def track_path_entries(self):
+        #TODO: resolve issue with "." in directory paths
         if not self.state_ready_collect == c.STATE_COLLECTING:
 
             is_set_playlist = self.map_tracked_entries['playlist'].get('set')
