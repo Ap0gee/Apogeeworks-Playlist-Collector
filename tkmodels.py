@@ -8,6 +8,7 @@ import constants as c
 import tkinter.constants as tkc
 from datetime import datetime
 from apcollections import Collector
+import logging
 import random
 import utils
 import settings
@@ -100,7 +101,7 @@ class RootFrame(Tk):
         self.style.theme_use("default")
         self.attributes('-topmost', False)
 
-        self.w, self.h = 425, 425
+        self.w, self.h = 425, 450
 
         self.parent = parent
 
@@ -132,7 +133,7 @@ class RootFrame(Tk):
             #     83: self.summoned, #"<Control-s>"
             #     73: self.destroy, #"<Alt-i>"
             #     88: self.destroy, #"<Alt-x>"
-            81: self.destroy,  # "<Alt-q>"
+            81: self.kill,  # "<Alt-q>"
         }
 
         self.tip_map = {
@@ -147,6 +148,16 @@ class RootFrame(Tk):
 
         self.error_map = {
         }
+
+        self.log = logging.getLogger(__name__)
+        self.handler_log = logging.FileHandler(
+            os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME),
+            mode='w+'
+        )
+        self.formatter_log = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+        self.handler_log.setFormatter(self.formatter_log)
+        self.log.addHandler(self.handler_log)
+        self.log.setLevel(logging.DEBUG)
 
         self.track_events()
         self.on_start()
@@ -246,21 +257,21 @@ class RootFrame(Tk):
     def get_error(self, err):
         pass
 
-    def console(self, msg, prefix=" >> ", end="\n", tag='', tag_start='insert-1c', tag_end='insert lineend+1c'):
-        self.frame_main.console(
-            msg,
-            prefix=prefix,
-            end=end,
-            tag=tag,
-            tag_start=tag_start,
-            tag_end=tag_end,
-        )
+    def console(self, msg, **kwargs):
+        self.frame_main.console(msg, **kwargs)
+
+    def log_info(self, msg, *args, **kwargs):
+        self.log.info(msg, *args, **kwargs)
 
     def on_start(self):
         self.console('process started')
         self.console('not ready', tag=c.TAG_TEXT_RED)
         self.alert_action_symbol('v%s' % utils.get_version())
         self.alert_action_info(self.get_tip(c.TIP_BROWSE))
+
+    def kill(self):
+        self.console("process terminated")
+        self.destroy()
 
 
 class RootSplashFrame(StyledTopLevel):
@@ -346,7 +357,7 @@ class RootToolFrame(StyledFrame):
             fg=c.COLOR_WHITE,
             width=2,
             relief=tkc.FLAT,
-            command=self.parent.minimize
+            command=self.root.minimize
         )
         self.btn_close = tkinter.Button(
             self,
@@ -356,7 +367,7 @@ class RootToolFrame(StyledFrame):
             fg=c.COLOR_WHITE,
             width=2,
             relief=tkc.FLAT,
-            command=self.parent.destroy
+            command=self.root.kill
         )
         self.grid(
             column=0, row=0,
@@ -498,10 +509,10 @@ class RootMainFrame(StyledFrame):
     def __init__(self, parent, **kwargs):
         StyledFrame.__init__(self, parent, **kwargs)
 
-        self.var_console_text_size = tkinter.IntVar()
-        self.var_console_text_size.set(9)
-        self.var_media_found_total = tkinter.IntVar()
-        self.var_media_lost_total = tkinter.IntVar()
+        self.var_console_text_size = tkinter.IntVar(value=9)
+        self.var_media_success_total = tkinter.IntVar()
+        self.var_media_failure_total = tkinter.IntVar()
+        self.var_media_total = tkinter.IntVar()
 
         self.state_ready_collect = c.STATE_NOT_READY
 
@@ -614,6 +625,72 @@ class RootMainFrame(StyledFrame):
             variable=self.var_console_text_size,
             command=self.set_console_text_size,
         )
+        self.progress_collection = ttk.Progressbar(
+            self,
+            orient=tkc.HORIZONTAL,
+            length=275,
+            mode=c.MODE_DETERMINATE
+        )
+        self.frame_totals = tkinter.Frame(
+            self.control_panel,
+            bg=c.COLOR_LIGHT_GREY,
+        )
+        self.label_media_success = tkinter.Label(
+            self.frame_totals,
+            text="Success:",
+            font=utils.tk_font(size=10),
+            width=7, height=1,
+            bg=c.COLOR_LIGHT_GREY,
+            relief=tkc.FLAT,
+            anchor=tkc.E,
+        )
+        self.label_value_media_success = tkinter.Label(
+            self.frame_totals,
+            textvariable=self.var_media_success_total,
+            font=utils.tk_font(size=10),
+            width=5, height=1,
+            bg=c.COLOR_LIGHT_GREY,
+            fg=c.COLOR_GREEN,
+            relief=tkc.FLAT,
+            anchor=tkc.W,
+        )
+        self.label_media_failure = tkinter.Label(
+            self.frame_totals,
+            text="Failure:",
+            font=utils.tk_font(size=10),
+            width=5, height=1,
+            bg=c.COLOR_LIGHT_GREY,
+            relief=tkc.FLAT,
+            anchor=tkc.E,
+        )
+        self.label_value_media_failure = tkinter.Label(
+            self.frame_totals,
+            textvariable=self.var_media_failure_total,
+            font=utils.tk_font(size=10),
+            width=5, height=1,
+            bg=c.COLOR_LIGHT_GREY,
+            fg=c.COLOR_RED,
+            relief=tkc.FLAT,
+            anchor=tkc.W,
+        )
+        self.label_media_total = tkinter.Label(
+            self.frame_totals,
+            text="Total:",
+            font=utils.tk_font(size=10),
+            width=4, height=1,
+            bg=c.COLOR_LIGHT_GREY,
+            relief=tkc.FLAT,
+            anchor=tkc.E,
+        )
+        self.label_value_media_total = tkinter.Label(
+            self.frame_totals,
+            textvariable=self.var_media_total,
+            font=utils.tk_font(size=10),
+            width=5, height=1,
+            bg=c.COLOR_LIGHT_GREY,
+            relief=tkc.FLAT,
+            anchor=tkc.W,
+        )
         self.btn_start_label = tkinter.Label(
             self.control_panel,
             text="",
@@ -683,11 +760,32 @@ class RootMainFrame(StyledFrame):
         self.scale_console_text.place(
             x=12, y=270
         )
-
-
-
+        self.progress_collection.place(
+            x=127, y=270
+        )
+        self.frame_totals.place(
+            x=0, y=300
+        )
+        self.label_media_success.pack(
+            side=tkc.LEFT
+        )
+        self.label_value_media_success.pack(
+            side=tkc.LEFT
+        )
+        self.label_media_failure.pack(
+            side=tkc.LEFT
+        )
+        self.label_value_media_failure.pack(
+            side=tkc.LEFT
+        )
+        self.label_media_total.pack(
+            side=tkc.LEFT
+        )
+        self.label_value_media_total.pack(
+            side=tkc.LEFT
+        )
         self.btn_start.place(
-            x=320, y=273
+            x=317, y=297
         )
         self.grid(
             column=0, row=1,
@@ -714,15 +812,26 @@ class RootMainFrame(StyledFrame):
         file_name, ext = os.path.splitext(path)
         return os.path.exists(path) and ext == '.wpl'
 
-    def console(self, msg, prefix=" >> ", end="\n", tag='', tag_start='insert-1c', tag_end='insert lineend+1c'):
+    def console(self, msg, **kwargs):
+        prefix = kwargs.get('prefix', ' >> ')
+        end = kwargs.get('end', '\n')
+        tag = kwargs.get('tag', "")
+        tag_start = kwargs.get('tag_start', 'insert-1c')
+        tag_end = kwargs.get('tag_end', 'insert lineend+1c')
+        log = kwargs.get('log', True)
+
         now = "[{}]".format(datetime.now().strftime("%Y/%m/%d - %H:%M:%S"))
         self.textbox_console_output.tag_add(tag, tag_start, tag_end)
         self.textbox_console_output.config(state=tkc.NORMAL)
         self.textbox_console_output.insert(tkc.END, now + prefix + msg + end)
+        self.textbox_console_output.tag_remove(tag, tag_start,tag_end)
         self.textbox_console_output.config(state=tkc.DISABLED)
         self.textbox_console_output.see(tkc.END)
-        self.textbox_console_output.tag_remove(tag, 'insert lineend-1c')
+
         self.update_idletasks()
+
+        if log:
+            self.root.log_info(msg)
 
     def set_collection_entry(self, path):
         self.entry_collection_path.delete(0, tkc.END)
@@ -746,15 +855,25 @@ class RootMainFrame(StyledFrame):
         self.set_tracked_entries_state(state=tkc.NORMAL)
         self.state_ready_collect = c.STATE_READY
         self.console("done!", tag=c.TAG_TEXT_GREEN)
-        #TODO: add logging
-        self.console("logs available @ ...", tag=c.TAG_TEXT_ORANGE)
+        self.console("logs available @ %s" % settings.DIR_LOGS, tag=c.TAG_TEXT_ORANGE, log=False)
 
     def collect_media(self, path_playlist, dir_target):
         self.state_ready_collect = c.STATE_COLLECTING
-        self.console("copying media...", tag=c.TAG_TEXT_ORANGE)
         self.root.alert_action_info(self.root.get_tip(c.TIP_RANDOM))
         media_collector = Collector(self.root, path_playlist, dir_target)
+        self.console("copying media from: %s..." % media_collector.file_name_full, tag=c.TAG_TEXT_ORANGE)
         media_collector.collect(callback=self.on_done_collect_media)
+
+    def set_progress_collection_attr(self, attr, value):
+        self.progress_collection[attr] = value
+
+    def set_result_total(self, result, value):
+        map_result = {
+            c.RESULT_FAILURE: self.var_media_failure_total,
+            c.RESULT_SUCCESS: self.var_media_success_total,
+            c.RESULT_TOTAL: self.var_media_total
+        }
+        map_result[result].set(value)
 
     def track_path_entries(self):
         if not self.state_ready_collect == c.STATE_COLLECTING:

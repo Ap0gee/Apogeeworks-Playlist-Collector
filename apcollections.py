@@ -3,7 +3,6 @@ __author__ = 'Apogee'
 import tkinter.constants as tkc
 import constants as c
 import _thread
-import time
 import shutil
 import bs4
 import sys
@@ -81,7 +80,13 @@ class Collector():
             except Exception:
                 raise FileExistsError
 
-        for path_source in self.get_source_file_paths():
+        frame_main = self.root.frame_main
+        list_source_files = self.get_source_file_paths()
+        list_source_files_total = len(list_source_files)
+        frame_main.set_progress_collection_attr(c.PB_SETTING_MAXIMUM, list_source_files_total)
+        frame_main.set_result_total(c.RESULT_TOTAL, list_source_files_total)
+
+        for index, path_source in enumerate(list_source_files):
 
             media_name_full = os.path.basename(str(path_source.decode('utf-8')))
             media_name, media_ext = self.get_path_split(media_name_full)
@@ -92,10 +97,11 @@ class Collector():
                     self.media_found.append(path_source)
                     try:
                         shutil.copyfile(path_source, path_media_target_full)
-                        console_tag = c.TAG_TEXT_BLUE
                     except shutil.Error:
                         self.media_lost.append(path_source)
                         console_tag = c.TAG_TEXT_RED
+                    else:
+                        console_tag = c.TAG_TEXT_BLUE
                 else:
                     self.media_lost.append(path_source)
                     console_tag = c.TAG_TEXT_RED
@@ -103,7 +109,11 @@ class Collector():
                 self.media_lost.append(path_source)
                 console_tag = c.TAG_TEXT_RED
 
-            self.root.console(path_media_target_full, tag=console_tag)
+            frame_main.set_progress_collection_attr(c.PB_SETTING_VALUE, index)
+            frame_main.set_result_total(c.RESULT_SUCCESS, len(self.media_found))
+            frame_main.set_result_total(c.RESULT_FAILURE, len(self.media_lost))
+            copy_result = c.RESULT_SUCCESS if not console_tag is c.TAG_TEXT_RED else c.RESULT_FAILURE
+            self.root.console("%s: %s" % (copy_result, path_media_target_full), tag=console_tag)
 
         if callback:
             callback()
