@@ -87,7 +87,7 @@ class Collector():
         frame_main.set_result_total(c.RESULT_TOTAL, list_source_files_total)
 
         for index, path_source in enumerate(list_source_files):
-
+            #TODO provide user with reason for failure
             media_name_full = os.path.basename(str(path_source.decode('utf-8')))
             media_name, media_ext = self.get_path_split(media_name_full)
             path_media_target_full = os.path.join(self.dir_target, media_name_full)
@@ -97,17 +97,21 @@ class Collector():
                     self.media_found.append(path_source)
                     try:
                         shutil.copyfile(path_source, path_media_target_full)
-                    except shutil.Error:
+                    except shutil.Error as e:
+                        print(e)
                         self.media_lost.append(path_source)
                         console_tag = c.TAG_TEXT_RED
                     else:
                         console_tag = c.TAG_TEXT_BLUE
+                        msg_failure_reason = None
                 else:
                     self.media_lost.append(path_source)
                     console_tag = c.TAG_TEXT_RED
+                    print("bad ext")
             else:
                 self.media_lost.append(path_source)
                 console_tag = c.TAG_TEXT_RED
+                print('bad path')
 
             frame_main.set_progress_collection_attr(c.PB_SETTING_VALUE, index)
             frame_main.set_result_total(c.RESULT_SUCCESS, len(self.media_found))
