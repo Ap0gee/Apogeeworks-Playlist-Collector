@@ -88,7 +88,8 @@ class Collector():
 
         for index, path_source in enumerate(list_source_files):
 
-            media_name_full = os.path.basename(str(path_source.decode('utf-8')))
+            path_source = str(path_source, 'utf-8')
+            media_name_full = os.path.basename(path_source)
             media_name, media_ext = self.get_path_split(media_name_full)
             path_media_target_full = os.path.join(self.dir_target, media_name_full)
 
@@ -113,7 +114,7 @@ class Collector():
             frame_main.set_result_total(c.RESULT_SUCCESS, len(self.media_found))
             frame_main.set_result_total(c.RESULT_FAILURE, len(self.media_lost))
             copy_result = c.RESULT_SUCCESS if not console_tag is c.TAG_TEXT_RED else c.RESULT_FAILURE
-            self.root.console("%s: %s" % (copy_result, path_media_target_full), tag=console_tag)
+            self.root.console("%s: %s" % (copy_result, path_source), tag=console_tag)
 
         if callback:
             callback()
