@@ -36,7 +36,7 @@ class Collector():
         try:
             with open(self.path_file, 'r') as f:
                 return f.read().replace('\n', '')
-        except IOError:
+        except Exception:
             msg_console = "%s: %s \n=> %s" % (
                 c.RESULT_FAILURE, self.path_file, self.root.get_error(c.ERROR_FILE_READ)
             )
@@ -86,8 +86,14 @@ class Collector():
         if not os.path.exists(self.dir_target):
             try:
                 os.mkdir(self.dir_target)
-            except Exception:
-                raise FileExistsError
+            except (FileNotFoundError, IOError):
+                msg_console = "%s: %s \n=> %s" % (
+                c.RESULT_FAILURE, self.dir_target, self.root.get_error(c.ERROR_DIRECTORY_CREATE)
+                )
+                self.root.console(msg_console, tag=c.TAG_TEXT_RED)
+
+                if callback:
+                    callback()
 
         frame_main = self.root.frame_main
         list_source_files = self.get_source_file_paths()
@@ -97,44 +103,49 @@ class Collector():
 
         for index, path_source in enumerate(list_source_files):
 
-            path_source = str(path_source, 'utf-8')
-            media_name_full = os.path.basename(path_source)
+            if frame_main.state_ready_collect is c.STATE_COLLECTING:
 
-            media_name, media_ext = self.get_path_split(media_name_full)
-            path_media_target_full = os.path.join(self.dir_target, media_name_full)
+                path_source = str(path_source, 'utf-8')
+                media_name_full = os.path.basename(path_source)
 
-            msg_failure_reason = None
+                media_name, media_ext = self.get_path_split(media_name_full)
+                path_media_target_full = os.path.join(self.dir_target, media_name_full)
 
-            if os.path.exists(path_source):
-                if path_source not in self.media_found:
-                    if media_ext in self.accepted_media_exts:
-                        try:
-                            shutil.copyfile(path_source, path_media_target_full)
-                        except shutil.Error:
-                            msg_failure_reason = self.root.get_error(c.ERROR_COPY_FAILED)
+                msg_failure_reason = None
+
+                if os.path.exists(path_source):
+                    if path_source not in self.media_found:
+                        if media_ext in self.accepted_media_exts:
+                            try:
+                                shutil.copyfile(path_source, path_media_target_full)
+                            except shutil.Error:
+                                msg_failure_reason = self.root.get_error(c.ERROR_COPY_FAILED)
+                        else:
+                            msg_failure_reason = self.root.get_error(c.ERROR_EXT_BAD)
                     else:
-                        msg_failure_reason = self.root.get_error(c.ERROR_EXT_BAD)
+                        msg_failure_reason = self.root.get_error(c.ERROR_DUPLICATE_MEDIA)
                 else:
-                    msg_failure_reason = self.root.get_error(c.ERROR_DUPLICATE_MEDIA)
+                    msg_failure_reason = self.root.get_error(c.ERROR_PATH_BAD)
+
+                if not msg_failure_reason:
+                    tag_console = c.TAG_TEXT_BLUE
+                    result_copy = c.RESULT_SUCCESS
+                    self.media_found.append(path_source)
+                    msg_console = "%s: %s" % (result_copy, path_source)
+                else:
+                    tag_console = c.TAG_TEXT_RED
+                    result_copy = c.RESULT_FAILURE
+                    self.media_lost.append(path_source)
+                    msg_console = "%s: %s \n=> %s" % (result_copy, path_source, msg_failure_reason)
+
+                frame_main.set_progress_collection_attr(c.PB_SETTING_VALUE, index)
+                frame_main.set_result_total(c.RESULT_SUCCESS, len(self.media_found))
+                frame_main.set_result_total(c.RESULT_FAILURE, len(self.media_lost))
+
+                self.root.console(msg_console, tag=tag_console)
+
             else:
-                msg_failure_reason = self.root.get_error(c.ERROR_PATH_BAD)
-
-            if not msg_failure_reason:
-                tag_console = c.TAG_TEXT_BLUE
-                result_copy = c.RESULT_SUCCESS
-                self.media_found.append(path_source)
-                msg_console = "%s: %s" % (result_copy, path_source)
-            else:
-                tag_console = c.TAG_TEXT_RED
-                result_copy = c.RESULT_FAILURE
-                self.media_lost.append(path_source)
-                msg_console = "%s: %s \n=> %s" % (result_copy, path_source, msg_failure_reason)
-
-            frame_main.set_progress_collection_attr(c.PB_SETTING_VALUE, index)
-            frame_main.set_result_total(c.RESULT_SUCCESS, len(self.media_found))
-            frame_main.set_result_total(c.RESULT_FAILURE, len(self.media_lost))
-
-            self.root.console(msg_console, tag=tag_console)
+                break
 
         if callback:
             callback()

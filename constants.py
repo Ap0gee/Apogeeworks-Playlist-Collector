@@ -23,6 +23,7 @@ STATE_READY = 'ready'
 STATE_COLLECTING = 'collecting'
 STATE_NOT_READY = 'not_ready'
 STATE_ERROR = 'error'
+STATE_STOPPED = 'stopped'
 ACTION_ADD = 'add'
 ACTION_REMOVE = 'remove'
 COLOR_GREEN = "#359946"
@@ -56,3 +57,5 @@ ERROR_PATH_BAD = 'error_path_bad'
 ERROR_COPY_FAILED = 'error_copy_failed'
 ERROR_DUPLICATE_MEDIA = 'error_duplicate_media'
 ERROR_FILE_READ = 'error_file_read'
+ERROR_DIRECTORY_CREATE = 'error_directory_create'
+

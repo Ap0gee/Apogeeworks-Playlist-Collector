@@ -148,7 +148,8 @@ class RootFrame(Tk):
             c.ERROR_EXT_BAD: "Media type not supported.",
             c.ERROR_COPY_FAILED: "Unable to copy media to destination.",
             c.ERROR_DUPLICATE_MEDIA: "Media already exists in directory.",
-            c.ERROR_FILE_READ: "Unable to read file."
+            c.ERROR_FILE_READ: "Unable to read file.",
+            c.ERROR_DIRECTORY_CREATE: "Unable to create directory."
         }
         self.log = logging.getLogger(__name__)
         self.handler_log = logging.FileHandler(
@@ -540,7 +541,7 @@ class RootMainFrame(StyledFrame):
         self.map_tracked_entries = {
             'collection': {
                 'widget': self.entry_collection_path,
-                'verified': lambda path: os.path.isdir(path),
+                'verified': lambda path: self.verify_dir_collection(path),
                 'set': False,
                 'last': None,
                 'browser': self.browser_collection_path
@@ -556,6 +557,8 @@ class RootMainFrame(StyledFrame):
         self.textbox_console_output.bindtags(
             (self.textbox_console_output, self.textbox_console_output, "all")
         )
+        self.textbox_console_output.bind_all("<MouseWheel>", self._on_mousewheel)
+
         self.textbox_console_output.tag_configure(
             c.TAG_TEXT_RED, foreground=c.COLOR_RED
         )
@@ -650,8 +653,13 @@ class RootMainFrame(StyledFrame):
             length=275,
             mode=c.MODE_DETERMINATE
         )
-        self.frame_totals = tkinter.Frame(
+        self.group_totals = tkinter.LabelFrame(
             self.control_panel,
+            font=utils.tk_font(size=10, weight=c.FONT_WEIGHT_BOLD),
+            text="Totals",
+        )
+        self.frame_totals = tkinter.Frame(
+            self.group_totals,
             bg=c.COLOR_LIGHT_GREY,
         )
         self.label_media_success = tkinter.Label(
@@ -731,6 +739,16 @@ class RootMainFrame(StyledFrame):
                 self.map_tracked_entries['collection'].get('last')
             )
         )
+        self.btn_stop = tkinter.Button(
+            self.control_panel,
+            text="STOP",
+            font=utils.tk_font(),
+            width=8, height=1,
+            bg=c.COLOR_RED,
+            fg=c.COLOR_WHITE,
+            relief=tkc.FLAT,
+            command=lambda: self.collect_stop()
+        )
         self.pack(
         )
         self.control_panel.pack(
@@ -782,8 +800,10 @@ class RootMainFrame(StyledFrame):
         self.progress_collection.place(
             x=127, y=270
         )
-        self.frame_totals.place(
-            x=0, y=300
+        self.group_totals.place(
+            x=0, y=288
+        )
+        self.frame_totals.pack(
         )
         self.label_media_success.pack(
             side=tkc.LEFT
@@ -831,6 +851,20 @@ class RootMainFrame(StyledFrame):
         file_name, ext = os.path.splitext(path)
         return os.path.exists(path) and ext == '.wpl'
 
+    def verify_dir_collection(self, path):
+        map_split = {
+            'p': path.split('.'),
+            'fs': path.split('/'),
+            'bs': path.split('\\')
+        }
+        for split_type, splits in map_split.items():
+            if split_type == "fs":
+                map_split[split_type] = True if splits.count('') <= 1 else False
+            else:
+                map_split[split_type] = True if '' not in splits else False
+
+        return os.path.isdir(path) and all(map_split.values())
+
     def console(self, msg, **kwargs):
         prefix = kwargs.get('prefix', ' >> ')
         end = kwargs.get('end', '\n')
@@ -870,18 +904,58 @@ class RootMainFrame(StyledFrame):
             entry.get('widget').configure(state=state)
             entry.get('browser').configure(state=state)
 
-    def on_done_collect_media(self):
+    def _on_done_collect_media(self):
         self.set_tracked_entries_state(state=tkc.NORMAL)
         self.state_ready_collect = c.STATE_READY
         self.console("done!", tag=c.TAG_TEXT_GREEN)
         self.console("logs available @ %s" % settings.DIR_LOGS, tag=c.TAG_TEXT_ORANGE, log=False)
 
+    def _on_mousewheel(self, event):
+        self.textbox_console_output.yview_scroll(-1*(event.delta), 'units')
+
     def collect_media(self, path_playlist, dir_target):
         self.state_ready_collect = c.STATE_COLLECTING
         self.root.alert_action_info(self.root.get_tip(c.TIP_RANDOM))
         media_collector = Collector(self.root, path_playlist, dir_target)
-        self.console("copying media from: %s..." % media_collector.file_name_full, tag=c.TAG_TEXT_ORANGE)
-        media_collector.collect(callback=self.on_done_collect_media)
+        self.console("copying media from: %s to: %s" % (media_collector.file_name_full, media_collector.dir_target), tag=c.TAG_TEXT_ORANGE)
+        media_collector.collect(callback=self._on_done_collect_media)
+
+    def collect_stop(self):
+        self.state_ready_collect = c.STATE_STOPPED
+        self.console("process stopped!")
+
+    def reset_progress(self):
+        self.var_media_total.set(0)
+        self.var_media_success_total.set(0)
+        self.var_media_failure_total.set(0)
+        self.set_progress_collection_attr(c.PB_SETTING_VALUE, 0)
+        self.set_progress_collection_attr(c.PB_SETTING_MAXIMUM, 0)
+
+    def clear_entries(self):
+        for entry in self.map_tracked_entries.values():
+            widget = entry.get('widget')
+            widget.delete(0, tkc.END)
+
+    def clear_console(self):
+        pass
+
+    def clear_all(self):
+        pass
+
+    def set_action_btn_by_state(self, state):
+        map_action_btn = {
+            c.STATE_READY: self.btn_start,
+            c.STATE_COLLECTING: self.btn_stop,
+        }
+        if state in map_action_btn.keys():
+
+            for btn_state, btn in map_action_btn.items():
+                if not btn_state == state:
+                    map_action_btn.get(state).pack_forget()
+                else:
+                    map_action_btn.get(state).place(
+                         x=317, y=297
+                    )
 
     def set_progress_collection_attr(self, attr, value):
         self.progress_collection[attr] = value
@@ -895,7 +969,6 @@ class RootMainFrame(StyledFrame):
         map_result[result].set(value)
 
     def track_path_entries(self):
-        #TODO: resolve issue with "." in directory paths
         if not self.state_ready_collect == c.STATE_COLLECTING:
 
             is_set_playlist = self.map_tracked_entries['playlist'].get('set')
@@ -903,7 +976,8 @@ class RootMainFrame(StyledFrame):
 
             for _type, entry in self.map_tracked_entries.items():
                 widget = entry.get('widget')
-                verified = entry.get('verified')(widget.get())
+                path = widget.get().strip()
+                verified = entry.get('verified')(path)
                 last = entry.get('last')
                 browser = entry.get('browser')
                 msg_path_state = '%s path verified @ "%s"'
@@ -914,7 +988,7 @@ class RootMainFrame(StyledFrame):
                     browser.config(text='Change')
 
                     if _type == 'playlist':
-                        path_playlist = widget.get()
+                        path_playlist = path
                         if last != path_playlist:
                             self.console(msg_path_state % (_type, path_playlist))
                             dir_playlist = os.path.dirname(path_playlist)
@@ -923,7 +997,7 @@ class RootMainFrame(StyledFrame):
                             entry.update(last=path_playlist)
 
                     elif _type == 'collection':
-                        dir_collection = widget.get()
+                        dir_collection = path
                         if last != dir_collection:
                             self.console(msg_path_state % (_type, dir_collection))
                             entry.update(last=dir_collection)
@@ -946,25 +1020,19 @@ class RootMainFrame(StyledFrame):
         self.root.after(100, self.track_path_entries)
 
     def track_collection_state(self):
-        btn_start_state = tkc.DISABLED
-        btn_start_color = c.COLOR_DARK_KNIGHT
-
         if self.state_ready_collect == c.STATE_NOT_READY:
             pass
 
         elif self.state_ready_collect == c.STATE_READY:
-            btn_start_state = tkc.NORMAL
-            btn_start_color = c.COLOR_GREEN
+           pass
 
         elif self.state_ready_collect == c.STATE_COLLECTING:
             self.set_tracked_entries_state(state=tkc.DISABLED)
 
-        self.btn_start.config(
-            state=btn_start_state,
-            bg=btn_start_color
-        )
+        elif self.state_ready_collect == c.STATE_STOPPED:
+            self.state_ready_collect = c.STATE_READY
 
-        #TODO: loading image
+        self.set_action_btn_by_state(self.state_ready_collect)
 
         self.root.after(50, self.track_collection_state)
 
