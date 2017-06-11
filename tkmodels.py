@@ -8,6 +8,7 @@ import constants as c
 import tkinter.constants as tkc
 from datetime import datetime
 from apcollections import Collector
+import subprocess
 import logging
 import random
 import utils
@@ -572,6 +573,11 @@ class RootMainFrame(StyledFrame):
             c.TAG_TEXT_BLUE, foreground=c.COLOR_BLUE
         )
 
+        self.label_clear_entries.bind('<Button-1>', lambda e: self.clear_entries())
+        self.label_clear_console.bind('<Button-1>', lambda e: self.clear_console())
+        self.label_clear_all.bind('<Button-1>', lambda e: self.clear_all())
+        self.label_view_logs.bind('<Button-1>', lambda e: self.view_logs())
+
         self.track_path_entries()
         self.track_console_output()
         self.track_collection_state()
@@ -585,7 +591,7 @@ class RootMainFrame(StyledFrame):
         self.control_panel = StyledFrame(
             self,
             width=self.root.w - 25,
-            height=self.root.h - 120,
+            height=self.root.h - 115,
             relief=tkc.RAISED
         )
         self.group_playlist = tkinter.LabelFrame(
@@ -628,6 +634,40 @@ class RootMainFrame(StyledFrame):
             relief=tkc.RAISED,
             command=lambda: self.browse_directory(self.entry_collection_path)
         )
+        self.frame_links_top = tkinter.Frame(
+            self.control_panel
+        )
+        self.frame_links_bottom = tkinter.Frame(
+            self.control_panel,
+        )
+        self.label_clear_entries = tkinter.Label(
+            self.frame_links_top,
+            fg=c.COLOR_BLUE,
+            font=utils.tk_font(size=10, weight='bold underline'),
+            text="clear paths",
+            cursor=c.CURSOR_HAND_2
+        )
+        self.label_clear_console = tkinter.Label(
+            self.frame_links_bottom,
+            fg=c.COLOR_BLUE,
+            font=utils.tk_font(size=10, weight='bold underline'),
+            text="clear console",
+            cursor=c.CURSOR_HAND_2
+        )
+        self.label_clear_all = tkinter.Label(
+            self.frame_links_bottom,
+            fg=c.COLOR_BLUE,
+            font=utils.tk_font(size=10, weight='bold underline'),
+            text="clear all",
+            cursor=c.CURSOR_HAND_2
+        )
+        self.label_view_logs = tkinter.Label(
+            self.frame_links_bottom,
+            fg=c.COLOR_ORANGE,
+            font=utils.tk_font(size=10, weight='bold underline'),
+            text="view logs",
+            cursor=c.CURSOR_HAND_2
+        )
         self.group_console = tkinter.LabelFrame(
             self.control_panel,
             font=utils.tk_font(size=10, weight=c.FONT_WEIGHT_BOLD),
@@ -637,8 +677,11 @@ class RootMainFrame(StyledFrame):
             self.group_console,
             height=100,
         )
+        self.frame_tools = tkinter.Frame(
+            self.control_panel
+        )
         self.scale_console_text = tkinter.Scale(
-            self,
+            self.frame_tools,
             from_=8, to=14,
             resolution=2,
             orient=tkc.HORIZONTAL,
@@ -648,7 +691,7 @@ class RootMainFrame(StyledFrame):
             command=self.set_console_text_size,
         )
         self.progress_collection = ttk.Progressbar(
-            self,
+            self.frame_tools,
             orient=tkc.HORIZONTAL,
             length=275,
             mode=c.MODE_DETERMINATE
@@ -660,14 +703,12 @@ class RootMainFrame(StyledFrame):
         )
         self.frame_totals = tkinter.Frame(
             self.group_totals,
-            bg=c.COLOR_LIGHT_GREY,
         )
         self.label_media_success = tkinter.Label(
             self.frame_totals,
             text="Success:",
             font=utils.tk_font(size=10),
             width=7, height=1,
-            bg=c.COLOR_LIGHT_GREY,
             relief=tkc.FLAT,
             anchor=tkc.E,
         )
@@ -676,7 +717,6 @@ class RootMainFrame(StyledFrame):
             textvariable=self.var_media_success_total,
             font=utils.tk_font(size=10),
             width=5, height=1,
-            bg=c.COLOR_LIGHT_GREY,
             fg=c.COLOR_GREEN,
             relief=tkc.FLAT,
             anchor=tkc.W,
@@ -686,7 +726,6 @@ class RootMainFrame(StyledFrame):
             text="Failure:",
             font=utils.tk_font(size=10),
             width=5, height=1,
-            bg=c.COLOR_LIGHT_GREY,
             relief=tkc.FLAT,
             anchor=tkc.E,
         )
@@ -695,7 +734,6 @@ class RootMainFrame(StyledFrame):
             textvariable=self.var_media_failure_total,
             font=utils.tk_font(size=10),
             width=5, height=1,
-            bg=c.COLOR_LIGHT_GREY,
             fg=c.COLOR_RED,
             relief=tkc.FLAT,
             anchor=tkc.W,
@@ -705,7 +743,6 @@ class RootMainFrame(StyledFrame):
             text="Total:",
             font=utils.tk_font(size=10),
             width=4, height=1,
-            bg=c.COLOR_LIGHT_GREY,
             relief=tkc.FLAT,
             anchor=tkc.E,
         )
@@ -714,17 +751,8 @@ class RootMainFrame(StyledFrame):
             textvariable=self.var_media_total,
             font=utils.tk_font(size=10),
             width=5, height=1,
-            bg=c.COLOR_LIGHT_GREY,
             relief=tkc.FLAT,
             anchor=tkc.W,
-        )
-        self.btn_start_label = tkinter.Label(
-            self.control_panel,
-            text="",
-            font=utils.tk_font(),
-            width=10, height=1,
-            bg=c.COLOR_LIGHT_GREY,
-            relief=tkc.FLAT,
         )
         self.btn_start = tkinter.Button(
             self.control_panel,
@@ -769,9 +797,13 @@ class RootMainFrame(StyledFrame):
             row=0, column=2,
             padx=(0, 0), pady=(0, 5)
         )
+        self.frame_links_top.pack(
+            anchor=tkc.W,
+            fill=tkc.X
+        )
         self.group_collection.pack(
             fill=tkc.X,
-            pady=(15, 0)
+            pady=(0, 0)
         )
         self.label_collection_path_entry.grid(
             row=0, column=0,
@@ -785,23 +817,48 @@ class RootMainFrame(StyledFrame):
             row=0, column=2,
             padx=(0, 0), pady=(0, 5)
         )
+        self.frame_links_bottom.pack(
+            anchor=tkc.W,
+            fill=tkc.X
+        )
+        self.label_clear_entries.pack(
+            side=tkc.LEFT,
+            padx=(0, 0), pady=(0, 0)
+        )
+        self.label_clear_console.pack(
+            side=tkc.LEFT,
+            padx=(0, 0), pady=(0, 0)
+        )
+        self.label_clear_all.pack(
+            side=tkc.LEFT,
+            padx=(10, 0), pady=(0, 0)
+        )
+        self.label_view_logs.pack(
+            side=tkc.RIGHT,
+            padx=(0, 0), pady=(0, 0)
+        )
         self.group_console.pack(
             fill=tkc.X,
-            pady=(15, 0)
+            padx=(0, 0), pady=(0, 0)
         )
         self.textbox_console_output = self.textbox_console_output.pack(
             fill=tkc.X,
-            pady=(0, 5),
-            padx=(5, 5)
+            pady=(0, 5),padx=(5, 5)
         )
-        self.scale_console_text.place(
-            x=12, y=270
+        self.frame_tools.pack(
+            fill=tkc.X
         )
-        self.progress_collection.place(
-            x=127, y=270
+        self.scale_console_text.pack(
+            side=tkc.LEFT,
+            padx=(0, 0), pady=(0, 0)
         )
-        self.group_totals.place(
-            x=0, y=288
+        self.progress_collection.pack(
+            side=tkc.LEFT,
+            padx=(10, 0), pady=(0, 0)
+        )
+        self.group_totals.pack(
+            anchor=tkc.W,
+            padx=(0, 0), pady=(5, 0)
         )
         self.frame_totals.pack(
         )
@@ -824,13 +881,12 @@ class RootMainFrame(StyledFrame):
             side=tkc.LEFT
         )
         self.btn_start.place(
-            x=317, y=297
+            x=317, y=302
         )
         self.grid(
             column=0, row=1,
-            pady=27
+            pady=25
         )
-
         self.update()
 
     def browse_file(self, tk_entry):
@@ -905,24 +961,30 @@ class RootMainFrame(StyledFrame):
             entry.get('browser').configure(state=state)
 
     def _on_done_collect_media(self):
-        self.set_tracked_entries_state(state=tkc.NORMAL)
-        self.state_ready_collect = c.STATE_READY
+        self.console("process stopped!") if self.state_ready_collect is c.STATE_STOPPED else None
         self.console("done!", tag=c.TAG_TEXT_GREEN)
         self.console("logs available @ %s" % settings.DIR_LOGS, tag=c.TAG_TEXT_ORANGE, log=False)
+        self.set_links_visible()
+        self.set_tracked_entries_state(state=tkc.NORMAL)
+        self.state_ready_collect = c.STATE_READY
 
     def _on_mousewheel(self, event):
-        self.textbox_console_output.yview_scroll(-1*(event.delta), 'units')
+        self.textbox_console_output.yview_scroll(int(-1*(event.delta/120)), 'units')
 
     def collect_media(self, path_playlist, dir_target):
         self.state_ready_collect = c.STATE_COLLECTING
         self.root.alert_action_info(self.root.get_tip(c.TIP_RANDOM))
         media_collector = Collector(self.root, path_playlist, dir_target)
-        self.console("copying media from: %s to: %s" % (media_collector.file_name_full, media_collector.dir_target), tag=c.TAG_TEXT_ORANGE)
+        self.console(
+            "copying media from: %s to: %s" %
+            (media_collector.file_name_full, media_collector.dir_target),
+            tag=c.TAG_TEXT_ORANGE
+        )
+        self.set_links_visible(False)
         media_collector.collect(callback=self._on_done_collect_media)
 
     def collect_stop(self):
         self.state_ready_collect = c.STATE_STOPPED
-        self.console("process stopped!")
 
     def reset_progress(self):
         self.var_media_total.set(0)
@@ -933,14 +995,35 @@ class RootMainFrame(StyledFrame):
 
     def clear_entries(self):
         for entry in self.map_tracked_entries.values():
-            widget = entry.get('widget')
-            widget.delete(0, tkc.END)
+            entry.get('widget').delete(0, tkc.END)
+            entry.update(set=False)
+            entry.update(last=None)
 
     def clear_console(self):
-        pass
+        self.textbox_console_output.config(state=tkc.NORMAL)
+        self.textbox_console_output.delete('1.0', tkc.END)
+        self.console("console cleared!")
+        self.textbox_console_output.config(state=tkc.DISABLED)
 
     def clear_all(self):
-        pass
+        self.reset_progress()
+        self.clear_entries()
+        self.clear_console()
+
+    def set_links_visible(self, visible=True):
+        avail_links = [
+            self.label_clear_entries,
+            self.label_clear_console, self.label_clear_all
+        ]
+        for link in avail_links:
+            link.pack_forget() \
+            if not visible else \
+            link.pack(
+                side=tkc.LEFT
+            )
+
+    def view_logs(self):
+        subprocess.call(["explorer", settings.DIR_LOGS])
 
     def set_action_btn_by_state(self, state):
         map_action_btn = {
@@ -948,14 +1031,10 @@ class RootMainFrame(StyledFrame):
             c.STATE_COLLECTING: self.btn_stop,
         }
         if state in map_action_btn.keys():
-
             for btn_state, btn in map_action_btn.items():
-                if not btn_state == state:
-                    map_action_btn.get(state).pack_forget()
-                else:
-                    map_action_btn.get(state).place(
-                         x=317, y=297
-                    )
+                btn.place_forget() \
+                    if not btn_state == state else \
+                btn.place(x=317, y=302)
 
     def set_progress_collection_attr(self, attr, value):
         self.progress_collection[attr] = value
@@ -969,7 +1048,7 @@ class RootMainFrame(StyledFrame):
         map_result[result].set(value)
 
     def track_path_entries(self):
-        if not self.state_ready_collect == c.STATE_COLLECTING:
+        if not self.state_ready_collect in [c.STATE_COLLECTING, c.STATE_STOPPED]:
 
             is_set_playlist = self.map_tracked_entries['playlist'].get('set')
             is_set_collection = self.map_tracked_entries['collection'].get('set')
@@ -995,6 +1074,7 @@ class RootMainFrame(StyledFrame):
                             if not is_set_collection:
                                 self.set_collection_entry(dir_playlist)
                             entry.update(last=path_playlist)
+                            self.reset_progress()
 
                     elif _type == 'collection':
                         dir_collection = path
@@ -1021,16 +1101,26 @@ class RootMainFrame(StyledFrame):
 
     def track_collection_state(self):
         if self.state_ready_collect == c.STATE_NOT_READY:
-            pass
-
+           self.btn_start.config(
+                bg=c.COLOR_DARK_KNIGHT,
+                state=tkc.DISABLED
+            )
         elif self.state_ready_collect == c.STATE_READY:
-           pass
-
+            self.btn_start.config(
+                bg=c.COLOR_GREEN,
+                state=tkc.NORMAL
+            )
         elif self.state_ready_collect == c.STATE_COLLECTING:
             self.set_tracked_entries_state(state=tkc.DISABLED)
-
+            self.btn_stop.config(
+                bg=c.COLOR_RED,
+                state=tkc.NORMAL
+            )
         elif self.state_ready_collect == c.STATE_STOPPED:
-            self.state_ready_collect = c.STATE_READY
+            self.btn_stop.config(
+                bg=c.COLOR_DARK_KNIGHT,
+                state=tkc.DISABLED
+            )
 
         self.set_action_btn_by_state(self.state_ready_collect)
 
