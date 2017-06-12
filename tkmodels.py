@@ -201,6 +201,20 @@ class RootFrame(Tk):
     def menu_viewing(self, value):
         self.__menu_viewing = value
 
+    def browse_file(self, tk_entry):
+        path = filedialog.askopenfilename()
+
+        if not path is '':
+            tk_entry.delete(0, tkc.END)
+            tk_entry.insert(0, path)
+
+    def browse_directory(self, tk_entry):
+        path = filedialog.askdirectory()
+
+        if not path is '':
+            tk_entry.delete(0, tkc.END)
+            tk_entry.insert(0, path)
+
     def on_hover(self, event):
         pass
 
@@ -530,9 +544,8 @@ class RootMenuFrame(StyledFrame):
 
     def view_menu(self, frame_menu):
         if self.root.menu_viewing:
-            #TODO kill prev menu
-        self.root.menu_viewing = frame_menu
-        frame_menu(self.root)
+            self.root.menu_viewing.destroy()
+        self.root.menu_viewing = frame_menu(self.root)
 
 
 class RootMainFrame(StyledFrame):
@@ -634,14 +647,14 @@ class RootMainFrame(StyledFrame):
             text="Change",
             width=6, height=1,
             relief=tkc.RAISED,
-            command=lambda: self.browse_file(self.entry_playlist_path)
+            command=lambda: self.root.browse_file(self.entry_playlist_path)
         )
         self.browser_collection_path = tkinter.Button(
             self.group_collection,
             text="Change",
             width=6, height=1,
             relief=tkc.RAISED,
-            command=lambda: self.browse_directory(self.entry_collection_path)
+            command=lambda: self.root.browse_directory(self.entry_collection_path)
         )
         self.frame_links_top = tkinter.Frame(
             self.control_panel
@@ -905,20 +918,6 @@ class RootMainFrame(StyledFrame):
     @state.setter
     def state(self, value):
         self.__state = value
-
-    def browse_file(self, tk_entry):
-        path = filedialog.askopenfilename()
-
-        if not path is '':
-            tk_entry.delete(0, tkc.END)
-            tk_entry.insert(0, path)
-
-    def browse_directory(self, tk_entry):
-        path = filedialog.askdirectory()
-
-        if not path is '':
-            tk_entry.delete(0, tkc.END)
-            tk_entry.insert(0, path)
 
     def verify_path_playlist(self, path):
         file_name, ext = os.path.splitext(path)
@@ -1199,6 +1198,16 @@ class RootConfigureFrame(StyledFrame):
 
         self.init_ui()
 
+        self.map_tracked_entries = {
+            'log': {
+                'widget': self.entry_log_path,
+                'verified': lambda: None,
+                'set': False,
+                'last': None,
+                'browser': self.browser_log_path
+            },
+        }
+
     def init_ui(self):
         self.config(
             bg=c.COLOR_WHITE,
@@ -1221,22 +1230,43 @@ class RootConfigureFrame(StyledFrame):
             text="Show tips",
             variable=self.var_show_tips,
         )
+        self.frame_slider = tkinter.Frame(
+            self.group_settings
+        )
         self.label_slider_alpha = tkinter.Label(
-            self.group_settings,
+            self.frame_slider,
             text="Frame drag alpha:"
         )
         self.label_slider_alpha_value = tkinter.Label(
-            self.group_settings,
-            textvariable=self.var_frame_drag_alpha
+            self.frame_slider,
+            textvariable=self.var_frame_drag_alpha,
         )
         self.scale_alpha = tkinter.Scale(
-            self.group_settings,
+            self.frame_slider,
             from_=.3, to=1,
             resolution=0.1,
             orient=tkc.HORIZONTAL,
             showvalue=False,
             width=20,
             variable=self.var_frame_drag_alpha,
+        )
+        self.frame_log = tkinter.Frame(
+            self.group_settings
+        )
+        self.label_log_path_entry = tkinter.Label(
+            self.frame_log,
+            text="Log File Path :"
+        )
+        self.entry_log_path = tkinter.Entry(
+            self.frame_log,
+            width=40,
+        )
+        self.browser_log_path = tkinter.Button(
+            self.frame_log,
+            text="Browse",
+            width=6, height=1,
+            relief=tkc.RAISED,
+            command=lambda: self.root.browse_directory(self.entry_log_path)
         )
         self.frame_button = tkinter.Frame(
             self.control_panel
@@ -1272,21 +1302,41 @@ class RootConfigureFrame(StyledFrame):
             padx=0, pady=0,
             sticky=tkc.W
         )
-        self.label_slider_alpha.grid(
+        self.frame_slider.grid(
             row=1, column=0,
-            padx=0, pady=0
+            padx=10, pady=0,
+            sticky=tkc.W
         )
-        self.label_slider_alpha_value.grid(
-            row=1, column=1,
-            padx=0, pady=0
+        self.label_slider_alpha.pack(
+            side=tkc.LEFT
         )
-        self.scale_alpha.grid(
-            row=1, column=2,
-            padx=0, pady=0
+        self.label_slider_alpha_value.pack(
+            side=tkc.LEFT
+        )
+        self.scale_alpha.pack(
+            side=tkc.LEFT
+        )
+        self.frame_log.grid(
+            row=3, column=0,
+            padx=0, pady=0,
+            sticky=tkc.W,
+        )
+        self.label_log_path_entry.pack(
+            side=tkc.LEFT,
+            padx=(0, 0), pady=(0, 0)
+        )
+        self.entry_log_path.pack(
+            side=tkc.LEFT,
+            padx=(20, 0), pady=(0, 0)
+        )
+        self.browser_log_path.pack(
+            side=tkc.LEFT,
+            padx=(0, 0), pady=(0, 0)
         )
         self.frame_button.pack(
             side=tkc.BOTTOM,
-            anchor=tkc.E
+            anchor=tkc.E,
+            padx=(0, 0), pady=(0, 0)
         )
         self.btn_exit.pack(
             side=tkc.RIGHT
