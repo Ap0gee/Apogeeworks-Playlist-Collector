@@ -506,12 +506,12 @@ class RootMenuFrame(StyledFrame):
         )
         self.options_menu.add_command(
             label="Configure...",
-            command=self.view_menu_config()
+            command=lambda: self.view_menu_config()
         )
         self.options_menu.add_separator()
         self.options_menu.add_command(
             label="View Tutorial...",
-            command=self.view_menu_tutorial()
+            command=lambda: self.view_menu_tutorial()
         )
 
         self.update()
@@ -520,7 +520,7 @@ class RootMenuFrame(StyledFrame):
         pass
 
     def view_menu_config(self):
-        pass
+        RootConfigureFrame(self.root)
 
     def view_menu_tutorial(self):
         pass
@@ -585,8 +585,8 @@ class RootMainFrame(StyledFrame):
     def init_ui(self):
         self.config(
             bg=c.COLOR_WHITE,
-            width=self.root.winfo_width(),
-            height=self.root.winfo_height()
+            width=self.root.w,
+            height=self.root.h
         )
         self.control_panel = StyledFrame(
             self,
@@ -1171,3 +1171,114 @@ class RootFooterFrame(StyledFrame):
             fill=tkc.BOTH
         )
         self.update()
+
+
+class RootConfigureFrame(StyledFrame):
+    def __init__(self, parent, **kwargs):
+        StyledFrame.__init__(self, parent, **kwargs)
+
+        self.var_show_tips = tkinter.BooleanVar(value=True)
+        self.var_frame_drag_alpha = tkinter.IntVar()
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.config(
+            bg=c.COLOR_WHITE,
+            width=self.root.frame_main.winfo_width(),
+            height=self.root.frame_main.winfo_height()
+        )
+        self.control_panel = StyledFrame(
+            self,
+            width=self.root.frame_main.control_panel.winfo_width(),
+            height=self.root.frame_main.control_panel.winfo_height(),
+            relief=tkc.RAISED
+        )
+        self.group_settings = tkinter.LabelFrame(
+            self.control_panel,
+            font=utils.tk_font(size=10, weight=c.FONT_WEIGHT_BOLD),
+            text="Settings",
+        )
+        self.checkbox_show_tips = tkinter.Checkbutton(
+            self.group_settings,
+            text="Show tips",
+            variable=self.var_show_tips,
+        )
+        self.label_slider_alpha = tkinter.Label(
+            self.group_settings,
+            text="Frame drag alpha:"
+        )
+        self.label_slider_alpha_value = tkinter.Label(
+            self.group_settings,
+            textvariable=self.var_frame_drag_alpha
+        )
+        self.scale_alpha = tkinter.Scale(
+            self.group_settings,
+            from_=.3, to=1,
+            resolution=0.1,
+            orient=tkc.HORIZONTAL,
+            showvalue=False,
+            width=20,
+            variable=self.var_frame_drag_alpha,
+        )
+        self.frame_button = tkinter.Frame(
+            self.control_panel
+        )
+        self.label_btn_exit = tkinter.Label(
+            self.frame_button,
+            text="SAVE AND",
+            font=utils.tk_font(),
+            width=10, height=1,
+            relief=tkc.FLAT,
+        )
+        self.btn_exit = tkinter.Button(
+            self.frame_button,
+            text="EXIT",
+            font=utils.tk_font(),
+            width=6, height=1,
+            bg=c.COLOR_RED,
+            fg="white",
+            relief=tkc.FLAT,
+            command=self.kill
+        )
+        self.pack(
+            padx=(0, 0), pady=(50, 0)
+        )
+        self.control_panel.pack(
+            padx=(0, 0), pady=(10, 0)
+        )
+        self.group_settings.pack(
+            fill=tkc.BOTH
+        )
+        self.checkbox_show_tips.grid(
+            row=0, column=0,
+            padx=0, pady=0,
+            sticky=tkc.W
+        )
+        self.label_slider_alpha.grid(
+            row=1, column=0,
+            padx=0, pady=0
+        )
+        self.label_slider_alpha_value.grid(
+            row=1, column=1,
+            padx=0, pady=0
+        )
+        self.scale_alpha.grid(
+            row=1, column=2,
+            padx=0, pady=0
+        )
+        self.frame_button.pack(
+            side=tkc.BOTTOM,
+            anchor=tkc.E
+        )
+        self.btn_exit.pack(
+            side=tkc.RIGHT
+        )
+        self.label_btn_exit.pack(
+            side=tkc.RIGHT
+        )
+        self.update()
+
+    def kill(self):
+        #TODO save settings
+        self.destroy()
