@@ -93,6 +93,7 @@ class SizedTextBox(tkinter.Frame):
 class RootFrame(Tk):
     def __init__(self, parent, **kwargs):
         Tk.__init__(self, **kwargs)
+        self.parent = parent
 
         self.overrideredirect(True)
         self.resizable(False, False)
@@ -104,7 +105,7 @@ class RootFrame(Tk):
 
         self.w, self.h = 425, 450
 
-        self.parent = parent
+        self.__menu_viewing = None
 
         self.init_ui()
 
@@ -191,6 +192,14 @@ class RootFrame(Tk):
         #self.control_frame = RootViewControlFrame(self)
 
         self.update()
+
+    @property
+    def menu_viewing(self):
+        return self.__menu_viewing
+
+    @menu_viewing.setter
+    def menu_viewing(self, value):
+        self.__menu_viewing = value
 
     def on_hover(self, event):
         pass
@@ -506,12 +515,12 @@ class RootMenuFrame(StyledFrame):
         )
         self.options_menu.add_command(
             label="Configure...",
-            command=lambda: self.view_menu_config()
+            command=lambda: self.view_menu(RootConfigureFrame)
         )
         self.options_menu.add_separator()
         self.options_menu.add_command(
             label="View Tutorial...",
-            command=lambda: self.view_menu_tutorial()
+            command=lambda: self.view_menu(RootTutorialFrame)
         )
 
         self.update()
@@ -519,11 +528,11 @@ class RootMenuFrame(StyledFrame):
     def menu_select_callback(self, event):
         pass
 
-    def view_menu_config(self):
-        RootConfigureFrame(self.root)
-
-    def view_menu_tutorial(self):
-        pass
+    def view_menu(self, frame_menu):
+        if self.root.menu_viewing:
+            #TODO kill prev menu
+        self.root.menu_viewing = frame_menu
+        frame_menu(self.root)
 
 
 class RootMainFrame(StyledFrame):
@@ -535,7 +544,7 @@ class RootMainFrame(StyledFrame):
         self.var_media_failure_total = tkinter.IntVar()
         self.var_media_total = tkinter.IntVar()
 
-        self.state_ready_collect = c.STATE_NOT_READY
+        self.__state = c.STATE_NOT_READY
 
         self.init_ui()
 
@@ -889,6 +898,14 @@ class RootMainFrame(StyledFrame):
         )
         self.update()
 
+    @property
+    def state(self):
+        return self.__state
+
+    @state.setter
+    def state(self, value):
+        self.__state = value
+
     def browse_file(self, tk_entry):
         path = filedialog.askopenfilename()
 
@@ -961,18 +978,18 @@ class RootMainFrame(StyledFrame):
             entry.get('browser').configure(state=state)
 
     def _on_done_collect_media(self):
-        self.console("process stopped!") if self.state_ready_collect is c.STATE_STOPPED else None
+        self.console("process stopped!") if self.state is c.STATE_STOPPED else None
         self.console("done!", tag=c.TAG_TEXT_GREEN)
         self.console("logs available @ %s" % settings.DIR_LOGS, tag=c.TAG_TEXT_ORANGE, log=False)
         self.set_links_visible()
         self.set_tracked_entries_state(state=tkc.NORMAL)
-        self.state_ready_collect = c.STATE_READY
+        self.state = c.STATE_READY
 
     def _on_mousewheel(self, event):
         self.textbox_console_output.yview_scroll(int(-1*(event.delta/120)), 'units')
 
     def collect_media(self, path_playlist, dir_target):
-        self.state_ready_collect = c.STATE_COLLECTING
+        self.state = c.STATE_COLLECTING
         self.root.alert_action_info(self.root.get_tip(c.TIP_RANDOM))
         media_collector = Collector(self.root, path_playlist, dir_target)
         self.console(
@@ -984,7 +1001,7 @@ class RootMainFrame(StyledFrame):
         media_collector.collect(callback=self._on_done_collect_media)
 
     def collect_stop(self):
-        self.state_ready_collect = c.STATE_STOPPED
+        self.state = c.STATE_STOPPED
 
     def reset_progress(self):
         self.var_media_total.set(0)
@@ -1048,7 +1065,7 @@ class RootMainFrame(StyledFrame):
         map_result[result].set(value)
 
     def track_path_entries(self):
-        if not self.state_ready_collect in [c.STATE_COLLECTING, c.STATE_STOPPED]:
+        if not self.state in [c.STATE_COLLECTING, c.STATE_STOPPED]:
 
             is_set_playlist = self.map_tracked_entries['playlist'].get('set')
             is_set_collection = self.map_tracked_entries['collection'].get('set')
@@ -1087,42 +1104,42 @@ class RootMainFrame(StyledFrame):
                     browser.config(text='Browse')
 
             if is_set_playlist and is_set_collection:
-                if self.state_ready_collect != c.STATE_READY:
+                if self.state != c.STATE_READY:
                     self.console("ready!", tag=c.TAG_TEXT_GREEN)
                     self.root.alert_action_info(self.root.get_tip(c.TIP_START))
-                    self.state_ready_collect = c.STATE_READY
+                    self.state = c.STATE_READY
             else:
-                if self.state_ready_collect != c.STATE_NOT_READY:
+                if self.state != c.STATE_NOT_READY:
                     self.console('not ready', tag=c.TAG_TEXT_RED)
                     self.root.alert_action_info(self.root.get_tip(c.TIP_BROWSE))
-                    self.state_ready_collect = c.STATE_NOT_READY
+                    self.state = c.STATE_NOT_READY
 
         self.root.after(100, self.track_path_entries)
 
     def track_collection_state(self):
-        if self.state_ready_collect == c.STATE_NOT_READY:
+        if self.state == c.STATE_NOT_READY:
            self.btn_start.config(
                 bg=c.COLOR_DARK_KNIGHT,
                 state=tkc.DISABLED
             )
-        elif self.state_ready_collect == c.STATE_READY:
+        elif self.state == c.STATE_READY:
             self.btn_start.config(
                 bg=c.COLOR_GREEN,
                 state=tkc.NORMAL
             )
-        elif self.state_ready_collect == c.STATE_COLLECTING:
+        elif self.state == c.STATE_COLLECTING:
             self.set_tracked_entries_state(state=tkc.DISABLED)
             self.btn_stop.config(
                 bg=c.COLOR_RED,
                 state=tkc.NORMAL
             )
-        elif self.state_ready_collect == c.STATE_STOPPED:
+        elif self.state == c.STATE_STOPPED:
             self.btn_stop.config(
                 bg=c.COLOR_DARK_KNIGHT,
                 state=tkc.DISABLED
             )
 
-        self.set_action_btn_by_state(self.state_ready_collect)
+        self.set_action_btn_by_state(self.state)
 
         self.root.after(50, self.track_collection_state)
 
@@ -1281,4 +1298,54 @@ class RootConfigureFrame(StyledFrame):
 
     def kill(self):
         #TODO save settings
+        self.destroy()
+
+
+class RootTutorialFrame(StyledFrame):
+    def __init__(self, parent, **kwargs):
+        StyledFrame.__init__(self, parent, **kwargs)
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.config(
+            bg=c.COLOR_WHITE,
+            width=self.root.frame_main.winfo_width(),
+            height=self.root.frame_main.winfo_height()
+        )
+        self.control_panel = StyledFrame(
+            self,
+            width=self.root.frame_main.control_panel.winfo_width(),
+            height=self.root.frame_main.control_panel.winfo_height(),
+            relief=tkc.RAISED
+        )
+        self.frame_button = tkinter.Frame(
+            self.control_panel
+        )
+        self.btn_exit = tkinter.Button(
+            self.frame_button,
+            text="EXIT",
+            font=utils.tk_font(),
+            width=6, height=1,
+            bg=c.COLOR_RED,
+            fg="white",
+            relief=tkc.FLAT,
+            command=self.kill
+        )
+        self.pack(
+            padx=(0, 0), pady=(50, 0)
+        )
+        self.control_panel.pack(
+            padx=(0, 0), pady=(10, 0)
+        )
+        self.frame_button.pack(
+            side=tkc.BOTTOM,
+            anchor=tkc.E
+        )
+        self.btn_exit.pack(
+            side=tkc.RIGHT
+        )
+        self.update()
+
+    def kill(self):
         self.destroy()

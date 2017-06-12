@@ -103,7 +103,7 @@ class Collector():
 
         for index, path_source in enumerate(list_source_files):
 
-            if frame_main.state_ready_collect is c.STATE_COLLECTING:
+            if frame_main.state is c.STATE_COLLECTING:
 
                 path_source = str(path_source, 'utf-8')
                 media_name_full = os.path.basename(path_source)
