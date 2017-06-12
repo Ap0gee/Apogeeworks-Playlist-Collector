@@ -58,4 +58,5 @@ ERROR_COPY_FAILED = 'error_copy_failed'
 ERROR_DUPLICATE_MEDIA = 'error_duplicate_media'
 ERROR_FILE_READ = 'error_file_read'
 ERROR_DIRECTORY_CREATE = 'error_directory_create'
-
+TYPE_ACTION = 'type_action'
+TYPE_TIP = 'type_tip'

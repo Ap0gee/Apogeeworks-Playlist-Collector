@@ -15,6 +15,7 @@ import utils
 import settings
 import os
 
+#TODO: fix alert_action_info
 
 class StyledFrame(tkinter.Frame):
     def __init__(self, parent, **kwargs):
@@ -33,15 +34,37 @@ class StyledFrame(tkinter.Frame):
         pass
 
 
-class StyledTopLevel(tkinter.Toplevel):
+class StyledTopLevelFrame(tkinter.Toplevel):
     def __init__(self, parent, **kwargs):
         tkinter.Toplevel.__init__(self, parent, **kwargs)
 
         self.overrideredirect(True)
+        self.style = ttk.Style()
+        self.style.theme_use("default")
         self.attributes('-topmost', True)
         self.is_viewing = False
         self.parent = parent
         self.root = utils.tk_get_root(self)
+
+    def init_ui(self):
+        pass
+
+
+class StyledMenuFrame(StyledFrame):
+    def __init__(self, parent, **kwargs):
+        StyledFrame.__init__(self, parent, **kwargs)
+
+        self.root_main_frame = self.root.frame_main
+        self.frame_main_cp = self.root_main_frame.control_panel
+
+        self.w, self.h = (
+            self.root_main_frame.winfo_width(),
+            self.root_main_frame.winfo_height()
+        )
+        self.cp_w, self.cp_h = (
+            self.frame_main_cp.winfo_width(),
+            self.frame_main_cp.winfo_height()
+        )
 
     def init_ui(self):
         pass
@@ -88,6 +111,49 @@ class SizedTextBox(tkinter.Frame):
         tkinter.Frame.grid(self, *args, **kwargs)
         self.grid_propagate(False)
         return self.widget
+
+
+class RootSplashFrame(StyledTopLevelFrame):
+    def __init__(self, parent, **kwargs):
+        StyledTopLevelFrame.__init__(self, parent, **kwargs)
+
+        self.init_ui()
+        self.show_logo()
+
+    def init_ui(self):
+        self.config(
+            bg=c.COLOR_DARK_KNIGHT
+        )
+        center_x, center_y = self.root.center_frame()
+        #TODO: fix image size
+        self.image_logo = tkinter.PhotoImage(
+            file=os.path.join(settings.DIR_IMAGES, "logo_apogeeworks.gif")
+        )
+        self.canvas_logo = tkinter.Canvas(
+            master=self,
+            bg=c.COLOR_DARK_KNIGHT,
+            border=None,
+            width=400, height=161,
+            bd=0,
+            highlightthickness=0,
+            relief='ridge'
+        )
+        self.canvas_logo.create_image(0, 0, image=self.image_logo, anchor=tkc.NW)
+
+        self.geometry(
+            '%dx%d+%d+%d' % (self.root.w, self.root.h, center_x, center_y)
+        )
+        self.canvas_logo.pack(
+            expand=tkc.YES,
+        )
+
+    def show_logo(self, duration_seconds=2):
+        self.update()
+        self.after(2000, self.hide_logo)
+
+    def hide_logo(self):
+        self.after_cancel(self.hide_logo)
+        self.destroy()
 
 
 class RootFrame(Tk):
@@ -267,9 +333,9 @@ class RootFrame(Tk):
         self.after(50, self.track_events)
 
     def alert_action_info(self, text, **kwargs):
-        fg = kwargs.get('fg', c.COLOR_DARK_KNIGHT)
+        fg = kwargs.get('fg', c.COLOR_WHITE)
         bg = kwargs.get('bg', c.COLOR_ORANGE)
-        font = kwargs.get('font', utils.tk_font(size=10))
+        font = kwargs.get('font', utils.tk_font(size=12))
 
         self.frame_footer.label_action_info.config(
             text=text,
@@ -288,15 +354,14 @@ class RootFrame(Tk):
             bg=bg,
         )
 
-    def get_tip(self, tip):
-        format_tip = '[Tip]: %s'
-        if not tip is c.TIP_RANDOM:
-            self.tip_map.update(last=self.tip_map[tip])
-            return format_tip % self.tip_map.get('last')
+    def get_tip(self, tip, format='[Tip]: %s'):
+        if not tip == c.TIP_RANDOM:
+            self.tip_map.update(tip_last=self.tip_map[tip])
+            return format % self.tip_map.get(c.TIP_LAST)
 
         list_tips = self.tip_map[tip]
-        self.tip_map.update(last=random.choice(list_tips))
-        return format_tip % self.tip_map.get('last')
+        self.tip_map.update(tip_last=random.choice(list_tips))
+        return format % self.tip_map.get(c.TIP_LAST)
 
     def get_error(self, err):
         return self.error_map[err]
@@ -311,53 +376,11 @@ class RootFrame(Tk):
         self.console('process started')
         self.console('not ready', tag=c.TAG_TEXT_RED)
         self.alert_action_symbol('v%s' % utils.get_version())
-        self.alert_action_info(self.get_tip(c.TIP_BROWSE))
+        self.alert_action_info(self.get_tip(c.TIP_BROWSE, format='%s'))
+        print(self.get_tip(c.TIP_LAST))
 
     def kill(self):
         self.console("process terminated")
-        self.destroy()
-
-
-class RootSplashFrame(StyledTopLevel):
-    def __init__(self, parent, **kwargs):
-        StyledTopLevel.__init__(self, parent, **kwargs)
-
-        self.init_ui()
-        self.show_logo()
-
-    def init_ui(self):
-        self.config(
-            bg=c.COLOR_DARK_KNIGHT
-        )
-        center_x, center_y = self.root.center_frame()
-        #TODO: fix image size
-        self.image_logo = tkinter.PhotoImage(
-            file=os.path.join(settings.DIR_IMAGES, "logo_apogeeworks.gif")
-        )
-        self.canvas_logo = tkinter.Canvas(
-            master=self,
-            bg=c.COLOR_DARK_KNIGHT,
-            border=None,
-            width=400, height=161,
-            bd=0,
-            highlightthickness=0,
-            relief='ridge'
-        )
-        self.canvas_logo.create_image(0, 0, image=self.image_logo, anchor=tkc.NW)
-
-        self.geometry(
-            '%dx%d+%d+%d' % (self.root.w, self.root.h, center_x, center_y)
-        )
-        self.canvas_logo.pack(
-            expand=tkc.YES,
-        )
-
-    def show_logo(self, duration_seconds=2):
-        self.update()
-        self.after(2000, self.hide_logo)
-
-    def hide_logo(self):
-        self.after_cancel(self.hide_logo)
         self.destroy()
 
 
@@ -989,7 +1012,11 @@ class RootMainFrame(StyledFrame):
 
     def collect_media(self, path_playlist, dir_target):
         self.state = c.STATE_COLLECTING
-        self.root.alert_action_info(self.root.get_tip(c.TIP_RANDOM))
+        self.root.alert_action_info(
+            self.root.get_tip(c.TIP_RANDOM),
+            fg=c.COLOR_DARK_KNIGHT,
+            font=utils.tk_font(size=10)
+        )
         media_collector = Collector(self.root, path_playlist, dir_target)
         self.console(
             "copying media from: %s to: %s" %
@@ -1097,6 +1124,9 @@ class RootMainFrame(StyledFrame):
                         if last != dir_collection:
                             self.console(msg_path_state % (_type, dir_collection))
                             entry.update(last=dir_collection)
+
+                    widget.xview_moveto(1)
+
                 else:
                     widget.config(bg=c.COLOR_RED)
                     entry.update(set=False)
@@ -1105,15 +1135,15 @@ class RootMainFrame(StyledFrame):
             if is_set_playlist and is_set_collection:
                 if self.state != c.STATE_READY:
                     self.console("ready!", tag=c.TAG_TEXT_GREEN)
-                    self.root.alert_action_info(self.root.get_tip(c.TIP_START))
+                    self.root.alert_action_info(self.root.get_tip(c.TIP_START, format='%s'))
                     self.state = c.STATE_READY
             else:
                 if self.state != c.STATE_NOT_READY:
                     self.console('not ready', tag=c.TAG_TEXT_RED)
-                    self.root.alert_action_info(self.root.get_tip(c.TIP_BROWSE))
+                    self.root.alert_action_info(self.root.get_tip(c.TIP_BROWSE, format='%s'))
                     self.state = c.STATE_NOT_READY
 
-        self.root.after(100, self.track_path_entries)
+        self.after(100, self.track_path_entries)
 
     def track_collection_state(self):
         if self.state == c.STATE_NOT_READY:
@@ -1189,53 +1219,59 @@ class RootFooterFrame(StyledFrame):
         self.update()
 
 
-class RootConfigureFrame(StyledFrame):
+class RootConfigureFrame(StyledMenuFrame):
     def __init__(self, parent, **kwargs):
-        StyledFrame.__init__(self, parent, **kwargs)
+        StyledMenuFrame.__init__(self, parent, **kwargs)
 
         self.var_show_tips = tkinter.BooleanVar(value=True)
-        self.var_frame_drag_alpha = tkinter.IntVar()
+        self.var_frame_drag_alpha = tkinter.IntVar(value=0.8)
+        self.var_enable_logging = tkinter.BooleanVar(value=True)
 
         self.init_ui()
 
         self.map_tracked_entries = {
             'log': {
                 'widget': self.entry_log_path,
-                'verified': lambda: None,
+                'verified': lambda path: self.verify_log_path(path),
                 'set': False,
                 'last': None,
                 'browser': self.browser_log_path
             },
         }
+        self.root.alert_action_info(
+            "Configure Settings"
+        )
+        self.set_config()
+        self.track_path_entries()
 
     def init_ui(self):
         self.config(
             bg=c.COLOR_WHITE,
-            width=self.root.frame_main.winfo_width(),
-            height=self.root.frame_main.winfo_height()
+            width=self.w,
+            height=self.h,
         )
         self.control_panel = StyledFrame(
             self,
-            width=self.root.frame_main.control_panel.winfo_width(),
-            height=self.root.frame_main.control_panel.winfo_height(),
-            relief=tkc.RAISED
+            width=self.cp_w,
+            height=self.cp_h,
+            relief=tkc.RAISED,
         )
         self.group_settings = tkinter.LabelFrame(
             self.control_panel,
             font=utils.tk_font(size=10, weight=c.FONT_WEIGHT_BOLD),
-            text="Settings",
+            text="Configuration Settings",
         )
         self.checkbox_show_tips = tkinter.Checkbutton(
             self.group_settings,
-            text="Show tips",
+            text="Show Tips",
             variable=self.var_show_tips,
         )
         self.frame_slider = tkinter.Frame(
-            self.group_settings
+            self.group_settings,
         )
         self.label_slider_alpha = tkinter.Label(
             self.frame_slider,
-            text="Frame drag alpha:"
+            text="Frame Drag Alpha :",
         )
         self.label_slider_alpha_value = tkinter.Label(
             self.frame_slider,
@@ -1250,12 +1286,17 @@ class RootConfigureFrame(StyledFrame):
             width=20,
             variable=self.var_frame_drag_alpha,
         )
+        self.checkbox_enable_logging = tkinter.Checkbutton(
+            self.group_settings,
+            text="Enable Logging",
+            variable=self.var_enable_logging,
+        )
         self.frame_log = tkinter.Frame(
-            self.group_settings
+            self.group_settings,
         )
         self.label_log_path_entry = tkinter.Label(
             self.frame_log,
-            text="Log File Path :"
+            text="Log File Path :",
         )
         self.entry_log_path = tkinter.Entry(
             self.frame_log,
@@ -1266,10 +1307,10 @@ class RootConfigureFrame(StyledFrame):
             text="Browse",
             width=6, height=1,
             relief=tkc.RAISED,
-            command=lambda: self.root.browse_directory(self.entry_log_path)
+            command=lambda: self.root.browse_file(self.entry_log_path),
         )
         self.frame_button = tkinter.Frame(
-            self.control_panel
+            self.control_panel,
         )
         self.label_btn_exit = tkinter.Label(
             self.frame_button,
@@ -1286,87 +1327,155 @@ class RootConfigureFrame(StyledFrame):
             bg=c.COLOR_RED,
             fg="white",
             relief=tkc.FLAT,
-            command=self.kill
+            command=self.kill,
         )
         self.pack(
-            padx=(0, 0), pady=(50, 0)
+            padx=(0, 0), pady=(50, 0),
         )
         self.control_panel.pack(
-            padx=(0, 0), pady=(10, 0)
+            padx=(0, 0), pady=(10, 0),
         )
         self.group_settings.pack(
-            fill=tkc.BOTH
+            fill=tkc.BOTH,
+            padx=(0, 0), pady=(0, 0),
         )
         self.checkbox_show_tips.grid(
             row=0, column=0,
-            padx=0, pady=0,
-            sticky=tkc.W
+            padx=(0, 0), pady=(0, 5),
+            sticky=tkc.W,
         )
         self.frame_slider.grid(
             row=1, column=0,
-            padx=10, pady=0,
-            sticky=tkc.W
+            padx=(0, 0), pady=(0, 5),
+            sticky=tkc.W,
         )
         self.label_slider_alpha.pack(
-            side=tkc.LEFT
+            side=tkc.LEFT,
+            padx=(0, 0), pady=(0, 0),
         )
         self.label_slider_alpha_value.pack(
-            side=tkc.LEFT
+            side=tkc.LEFT,
+            padx=(10, 0), pady=(0, 0),
         )
         self.scale_alpha.pack(
-            side=tkc.LEFT
+            side=tkc.LEFT,
+            padx=(0, 0), pady=(0, 0),
+        )
+        self.checkbox_enable_logging.grid(
+            row=2, column=0,
+            padx=(0, 0), pady=(0, 5),
+            sticky=tkc.W,
         )
         self.frame_log.grid(
             row=3, column=0,
-            padx=0, pady=0,
+            padx=(0, 0), pady=(0, 5),
             sticky=tkc.W,
         )
         self.label_log_path_entry.pack(
             side=tkc.LEFT,
-            padx=(0, 0), pady=(0, 0)
+            padx=(0, 0), pady=(0, 0),
         )
         self.entry_log_path.pack(
             side=tkc.LEFT,
-            padx=(20, 0), pady=(0, 0)
+            padx=(15, 0), pady=(0, 0),
         )
         self.browser_log_path.pack(
             side=tkc.LEFT,
-            padx=(0, 0), pady=(0, 0)
+            padx=(0, 0), pady=(0, 0),
         )
         self.frame_button.pack(
             side=tkc.BOTTOM,
             anchor=tkc.E,
-            padx=(0, 0), pady=(0, 0)
+            padx=(0, 0), pady=(0, 0),
         )
         self.btn_exit.pack(
-            side=tkc.RIGHT
+            side=tkc.RIGHT,
+            padx=(0, 0), pady=(0, 0),
         )
         self.label_btn_exit.pack(
-            side=tkc.RIGHT
+            side=tkc.RIGHT,
+            padx=(0, 0), pady=(0, 0),
         )
+
         self.update()
 
+    def set_config(self):
+        #TODO: read and set config values
+        self.entry_log_path.insert(
+            tkc.END,
+            os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)
+        )
+
+    def track_path_entries(self):
+        for _type, entry in self.map_tracked_entries.items():
+            widget = entry.get('widget')
+            path = widget.get().strip()
+            verified = entry.get('verified')(path)
+            last = entry.get('last')
+            browser = entry.get('browser')
+            msg_path_state = '%s path verified @ "%s"'
+
+            if _type == 'log':
+                if self.var_enable_logging.get():
+                    log_browser_state = log_entry_state = log_label_state = tkc.NORMAL
+                else:
+                    log_browser_state = log_entry_state = log_label_state = tkc.DISABLED
+
+                widget.config(
+                    state=log_entry_state
+                )
+                browser.config(
+                    state=log_browser_state
+                )
+                self.label_log_path_entry.config(
+                    state=log_label_state
+                )
+            if verified:
+                widget.config(bg=c.COLOR_GREEN)
+                entry.update(set=True)
+                browser.config(text='Change')
+                if last != path:
+                    self.root.log_info(msg_path_state % (_type, path))
+                    entry.update(last=path)
+                widget.xview_moveto(1)
+            else:
+                widget.config(bg=c.COLOR_RED)
+                entry.update(set=False)
+                browser.config(text='Browse')
+
+        self.after(100, self.track_path_entries)
+
+    def verify_log_path(self, path):
+        file_name, ext = os.path.splitext(path)
+        return os.path.exists(path) and ext == '.log'
+
     def kill(self):
-        #TODO save settings
+        self.after_cancel(self.track_path_entries)
+        self.root.log_info('configure settings saved!')
+        self.root.alert_action_info(
+            self.root.get_tip(c.TIP_LAST),
+            fg=c.COLOR_DARK_KNIGHT,
+            font=utils.tk_font(size=10)
+        )
         self.destroy()
 
 
-class RootTutorialFrame(StyledFrame):
+class RootTutorialFrame(StyledMenuFrame):
     def __init__(self, parent, **kwargs):
-        StyledFrame.__init__(self, parent, **kwargs)
+        StyledMenuFrame.__init__(self, parent, **kwargs)
 
         self.init_ui()
 
     def init_ui(self):
         self.config(
             bg=c.COLOR_WHITE,
-            width=self.root.frame_main.winfo_width(),
-            height=self.root.frame_main.winfo_height()
+            width=self.w,
+            height=self.h,
         )
         self.control_panel = StyledFrame(
             self,
-            width=self.root.frame_main.control_panel.winfo_width(),
-            height=self.root.frame_main.control_panel.winfo_height(),
+            width=self.cp_w,
+            height=self.cp_h,
             relief=tkc.RAISED
         )
         self.frame_button = tkinter.Frame(
