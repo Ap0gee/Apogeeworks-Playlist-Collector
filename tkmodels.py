@@ -29,8 +29,12 @@ class StyledFrame(tkinter.Frame):
         )
         self.parent = parent
         self.root = utils.tk_get_root(self)
+        self.root.frame_register(self)
 
     def init_ui(self):
+        pass
+
+    def on_start(self):
         pass
 
 
@@ -47,6 +51,9 @@ class StyledTopLevelFrame(tkinter.Toplevel):
         self.root = utils.tk_get_root(self)
 
     def init_ui(self):
+        pass
+
+    def on_start(self):
         pass
 
 
@@ -173,6 +180,8 @@ class RootFrame(Tk):
 
         self.__menu_viewing = None
 
+        self.__registered_frames = []
+
         self.init_ui()
 
         self.bind(
@@ -202,6 +211,7 @@ class RootFrame(Tk):
             # 88: self.destroy, #"<Alt-x>"
             81: self.kill, #"<Alt-q>"
         }
+
         self.tip_map = {
             c.TIP_BROWSE: 'Browse for and select your paths.',
             c.TIP_START: 'Press the "Start" button to begin!',
@@ -231,7 +241,6 @@ class RootFrame(Tk):
         self.log.addHandler(self.handler_log)
         self.log.setLevel(logging.DEBUG)
 
-        self.track_events()
         self.on_start()
 
     def init_ui(self):
@@ -372,12 +381,15 @@ class RootFrame(Tk):
     def log_info(self, msg, *args, **kwargs):
         self.log.info(msg, *args, **kwargs)
 
+    def frame_register(self, tk_frame):
+        self.__registered_frames.append(tk_frame)
+
     def on_start(self):
         self.console('process started')
-        self.console('not ready', tag=c.TAG_TEXT_RED)
         self.alert_action_symbol('v%s' % utils.get_version())
-        self.alert_action_info(self.get_tip(c.TIP_BROWSE, format='%s'))
-        print(self.get_tip(c.TIP_LAST))
+        self.track_events()
+        for frame in self.__registered_frames:
+            frame.on_start()
 
     def kill(self):
         self.console("process terminated")
@@ -580,7 +592,7 @@ class RootMainFrame(StyledFrame):
         self.var_media_failure_total = tkinter.IntVar()
         self.var_media_total = tkinter.IntVar()
 
-        self.__state = c.STATE_NOT_READY
+        self.__state = None
 
         self.init_ui()
 
@@ -622,10 +634,6 @@ class RootMainFrame(StyledFrame):
         self.label_clear_console.bind('<Button-1>', lambda e: self.clear_console())
         self.label_clear_all.bind('<Button-1>', lambda e: self.clear_all())
         self.label_view_logs.bind('<Button-1>', lambda e: self.view_logs())
-
-        self.track_path_entries()
-        self.track_console_output()
-        self.track_collection_state()
 
     def init_ui(self):
         self.config(
@@ -1135,33 +1143,38 @@ class RootMainFrame(StyledFrame):
             if is_set_playlist and is_set_collection:
                 if self.state != c.STATE_READY:
                     self.console("ready!", tag=c.TAG_TEXT_GREEN)
-                    self.root.alert_action_info(self.root.get_tip(c.TIP_START, format='%s'))
                     self.state = c.STATE_READY
             else:
                 if self.state != c.STATE_NOT_READY:
                     self.console('not ready', tag=c.TAG_TEXT_RED)
-                    self.root.alert_action_info(self.root.get_tip(c.TIP_BROWSE, format='%s'))
                     self.state = c.STATE_NOT_READY
 
         self.after(100, self.track_path_entries)
 
     def track_collection_state(self):
         if self.state == c.STATE_NOT_READY:
-           self.btn_start.config(
+            self.btn_start.config(
                 bg=c.COLOR_DARK_KNIGHT,
                 state=tkc.DISABLED
             )
+            if not self.root.menu_viewing:
+               self.root.alert_action_info(self.root.get_tip(c.TIP_BROWSE, format='%s'))
+
         elif self.state == c.STATE_READY:
             self.btn_start.config(
                 bg=c.COLOR_GREEN,
                 state=tkc.NORMAL
             )
+            if not self.root.menu_viewing:
+                self.root.alert_action_info(self.root.get_tip(c.TIP_START, format='%s'))
+
         elif self.state == c.STATE_COLLECTING:
             self.set_tracked_entries_state(state=tkc.DISABLED)
             self.btn_stop.config(
                 bg=c.COLOR_RED,
                 state=tkc.NORMAL
             )
+
         elif self.state == c.STATE_STOPPED:
             self.btn_stop.config(
                 bg=c.COLOR_DARK_KNIGHT,
@@ -1174,6 +1187,11 @@ class RootMainFrame(StyledFrame):
 
     def track_console_output(self):
         pass
+
+    def on_start(self):
+        self.track_collection_state()
+        self.track_path_entries()
+        self.track_console_output()
 
 
 class RootFooterFrame(StyledFrame):
@@ -1241,8 +1259,6 @@ class RootConfigureFrame(StyledMenuFrame):
         self.root.alert_action_info(
             "Configure Settings"
         )
-        self.set_config()
-        self.track_path_entries()
 
     def init_ui(self):
         self.config(
@@ -1449,14 +1465,14 @@ class RootConfigureFrame(StyledMenuFrame):
         file_name, ext = os.path.splitext(path)
         return os.path.exists(path) and ext == '.log'
 
+    def on_start(self):
+        self.set_config()
+        self.track_path_entries()
+
     def kill(self):
+        self.root.menu_viewing=None
         self.after_cancel(self.track_path_entries)
         self.root.log_info('configure settings saved!')
-        self.root.alert_action_info(
-            self.root.get_tip(c.TIP_LAST),
-            fg=c.COLOR_DARK_KNIGHT,
-            font=utils.tk_font(size=10)
-        )
         self.destroy()
 
 
@@ -1507,4 +1523,5 @@ class RootTutorialFrame(StyledMenuFrame):
         self.update()
 
     def kill(self):
+        self.root.menu_viewing=None
         self.destroy()
