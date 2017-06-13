@@ -10,12 +10,12 @@ from datetime import datetime
 from apcollections import Collector
 import subprocess
 import logging
+import configparser
 import random
 import utils
 import settings
 import os
 
-#TODO: fix alert_action_info
 
 class StyledFrame(tkinter.Frame):
     def __init__(self, parent, **kwargs):
@@ -221,6 +221,7 @@ class RootFrame(Tk):
             ],
             c.TIP_LAST: ''
         }
+
         self.error_map = {
             c.ERROR_PATH_BAD: "Media at this location not found.",
             c.ERROR_EXT_BAD: "Media type not supported.",
@@ -229,6 +230,7 @@ class RootFrame(Tk):
             c.ERROR_FILE_READ: "Unable to read file.",
             c.ERROR_DIRECTORY_CREATE: "Unable to create directory."
         }
+
         self.log = logging.getLogger(__name__)
         self.handler_log = logging.FileHandler(
             os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME),
@@ -240,6 +242,8 @@ class RootFrame(Tk):
         self.handler_log.setFormatter(self.formatter_log)
         self.log.addHandler(self.handler_log)
         self.log.setLevel(logging.DEBUG)
+
+        self.settings = self.get_settings()
 
         self.on_start()
 
@@ -384,13 +388,38 @@ class RootFrame(Tk):
     def frame_register(self, tk_frame):
         self.__registered_frames.append(tk_frame)
 
+    def get_settings(self):
+        config_parser = configparser.ConfigParser()
+        file_config = os.path.join(settings.DIR_CONFIG, settings.FILE_CONFIG_NAME)
+        try:
+            with open(file_config, 'r') as f:
+                return config_parser.read(f)
+        except (IOError):
+            with open(file_config, 'w') as f:
+                config_parser.add_section('General')
+                config_parser.set('General', 'StayOnTop', 'False')
+                config_parser.set('General', 'ShowTips', 'True')
+                config_parser.add_section('Visual')
+                config_parser.set('Visual', 'FrameDragAlpha', '0.8')
+                config_parser.add_section('Logging')
+                config_parser.set('Logging', 'EnableLogging', 'True')
+                config_parser.set(
+                    'Logging', 'LogFilePath', os.path.join(
+                        settings.DIR_LOGS, settings.FILE_LOG_NAME
+                    )
+                )
+                config_parser.write(f)
+
+            with open(file_config, 'r') as f:
+                return config_parser.read(f)
+
     def on_start(self):
         self.console('process started')
         self.alert_action_symbol('v%s' % utils.get_version())
-        self.track_events()
+        print(self.settings)
         for frame in self.__registered_frames:
             frame.on_start()
-
+        self.track_events()
     def kill(self):
         self.console("process terminated")
         self.destroy()
