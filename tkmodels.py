@@ -1184,14 +1184,14 @@ class RootMainFrame(StyledFrame):
                                 self.set_collection_entry(dir_playlist)
                             entry.update(last=path_playlist)
                             self.reset_progress()
+                            widget.xview_moveto(1)
 
                     elif _type == 'collection':
                         dir_collection = path
                         if last != dir_collection:
                             self.console(msg_path_state % (_type, dir_collection))
                             entry.update(last=dir_collection)
-
-                    widget.xview_moveto(1)
+                            widget.xview_moveto(1)
 
                 else:
                     widget.config(bg=c.COLOR_RED)
@@ -1506,7 +1506,7 @@ class RootConfigureFrame(StyledMenuFrame):
                 if last != path:
                     self.root.log_info(msg_path_state % (_type, path))
                     entry.update(last=path)
-                widget.xview_moveto(1)
+                    widget.xview_moveto(1)
             else:
                 widget.config(bg=c.COLOR_RED)
                 entry.update(set=False)

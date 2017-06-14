@@ -54,3 +54,4 @@ wpl/*
 *.log
 __pycache__/*
 *.pyc
+config/*
