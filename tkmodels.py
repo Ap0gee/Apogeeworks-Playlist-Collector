@@ -237,14 +237,27 @@ class RootFrame(Tk):
             c.ERROR_DIRECTORY_CREATE: "Unable to create directory."
         }
 
-        self.log = logging.getLogger(__name__)
-        self.formatter_log = logging.Formatter(
-            '%(asctime)s %(levelname)s %(message)s'
-        )
+        self.map_config_settings = {
+            'General': {
+                'StayOnTop': 'False',
+                'ShowTips': 'True',
+            },
+            'Visual': {
+                'FrameDragAlpha': '0.8',
+            },
+            'Logging': {
+                'LoggingEnabled': 'True',
+                'LogFilePath': os.path.join(
+                    settings.DIR_LOGS, settings.FILE_LOG_NAME
+                )
+            },
+        }
 
         self.config_settings = self.get_config()
+        self.apply_config()
 
-        self.apply_config(self.config_settings)
+        self.log = self.get_log()
+
         self.on_start()
 
     def init_ui(self):
@@ -390,14 +403,19 @@ class RootFrame(Tk):
             self.__registered_frames.append(tk_frame)
 
     def get_config(self):
+        #TODO: use config setting map to ensure all settings found
         config_parser = configparser.ConfigParser()
-        file_config = os.path.join(settings.DIR_CONFIG, settings.FILE_CONFIG_NAME)
+
+        file_config = self.map_config_settings.get('Logging').get('LogFilePath')
 
         def read_settings():
             if config_parser.read(file_config):
                 return config_parser
             else:
                 raise FileNotFoundError
+
+        def verify_settings():
+            pass
 
         def add_settings():
             config_parser.add_section('General')
@@ -426,12 +444,26 @@ class RootFrame(Tk):
     def set_config(self, category, setting, value):
         self.config_settings.set(category, setting, value)
 
+    def get_log(self):
+        log = logging.getLogger(__name__)
+        self.handler_log = logging.FileHandler(
+            self.get_config_setting('Logging', 'LogFilePath'),
+            mode='w+'
+        )
+        self.formatter_log = logging.Formatter(
+            '%(asctime)s %(levelname)s %(message)s'
+        )
+        self.handler_log.setFormatter(self.formatter_log)
+        log.addHandler(self.handler_log)
+        log.setLevel(logging.DEBUG)
+        return log
+
     def save_config(self):
         file_config = os.path.join(settings.DIR_CONFIG, settings.FILE_CONFIG_NAME)
         with open(file_config, 'w') as f:
             self.config_settings.write(f)
 
-    def apply_config(self, config_settings):
+    def apply_config(self):
         setting_logfile_path = self.get_config_setting('Logging', 'LogFilePath')
 
         if not RootConfigureFrame.verify_log_path(setting_logfile_path):
@@ -442,13 +474,6 @@ class RootFrame(Tk):
     def on_start(self):
         self.console('process started')
         self.alert_action_symbol('v%s' % utils.get_version())
-        self.handler_log = logging.FileHandler(
-            self.get_config_setting('Logging', 'LogFilePath'),
-            mode='w+'
-        )
-        self.handler_log.setFormatter(self.formatter_log)
-        self.log.addHandler(self.handler_log)
-        self.log.setLevel(logging.DEBUG)
 
         for frame in self.__registered_frames:
             frame.apply_config(self.config_settings)
@@ -677,6 +702,7 @@ class RootMainFrame(StyledFrame):
                 'browser': self.browser_playlist_path
             }
         }
+
         self.textbox_console_output.bindtags(
             (self.textbox_console_output, self.textbox_console_output, "all")
         )
@@ -1309,6 +1335,7 @@ class RootConfigureFrame(StyledMenuFrame):
     def __init__(self, parent, **kwargs):
         StyledMenuFrame.__init__(self, parent, **kwargs)
 
+        self.var_stay_top = tkinter.BooleanVar()
         self.var_show_tips = tkinter.BooleanVar()
         self.var_frame_drag_alpha = tkinter.DoubleVar()
         self.var_enable_logging = tkinter.BooleanVar()
@@ -1324,10 +1351,12 @@ class RootConfigureFrame(StyledMenuFrame):
                 'browser': self.browser_log_path
             },
         }
+
         self.root.alert_action_info(
             "Configure Settings"
         )
 
+        self.apply_config(self.root.config_settings)
         self.on_start()
 
     def init_ui(self):
@@ -1346,6 +1375,11 @@ class RootConfigureFrame(StyledMenuFrame):
             self.control_panel,
             font=utils.tk_font(size=10, weight=c.FONT_WEIGHT_BOLD),
             text="Configuration Settings",
+        )
+        self.checkbox_stay_top = tkinter.Checkbutton(
+            self.group_settings,
+            text="Stay on Top",
+            variable=self.var_stay_top,
         )
         self.checkbox_show_tips = tkinter.Checkbutton(
             self.group_settings,
@@ -1425,13 +1459,18 @@ class RootConfigureFrame(StyledMenuFrame):
             fill=tkc.BOTH,
             padx=(0, 0), pady=(0, 0),
         )
-        self.checkbox_show_tips.grid(
+        self.checkbox_stay_top.grid(
             row=0, column=0,
             padx=(0, 0), pady=(0, 5),
             sticky=tkc.W,
         )
-        self.frame_slider.grid(
+        self.checkbox_show_tips.grid(
             row=1, column=0,
+            padx=(0, 0), pady=(0, 5),
+            sticky=tkc.W,
+        )
+        self.frame_slider.grid(
+            row=2, column=0,
             padx=(0, 0), pady=(0, 5),
             sticky=tkc.W,
         )
@@ -1448,12 +1487,12 @@ class RootConfigureFrame(StyledMenuFrame):
             padx=(0, 0), pady=(0, 0),
         )
         self.checkbox_enable_logging.grid(
-            row=2, column=0,
+            row=3, column=0,
             padx=(0, 0), pady=(0, 5),
             sticky=tkc.W,
         )
         self.frame_log.grid(
-            row=3, column=0,
+            row=4, column=0,
             padx=(0, 0), pady=(0, 5),
             sticky=tkc.W,
         )
@@ -1530,17 +1569,18 @@ class RootConfigureFrame(StyledMenuFrame):
         return os.path.exists(path) and ext == '.log'
 
     def apply_config(self, config_settings):
+        setting_stay_top = config_settings.get('General', 'StayOnTop')
         setting_show_tips = config_settings.get('General', 'ShowTips')
         setting_frame_drag_alpha = config_settings.get('Visual', 'FrameDragAlpha')
         setting_enable_logging = config_settings.get('Logging', 'EnableLogging')
         setting_logfile_path = config_settings.get('Logging', 'LogFilePath')
+        self.var_stay_top.set(setting_stay_top)
         self.var_show_tips.set(setting_show_tips)
         self.var_frame_drag_alpha.set(setting_frame_drag_alpha)
         self.var_enable_logging.set(setting_enable_logging)
         self.entry_log_path.insert(0, setting_logfile_path)
 
     def on_start(self):
-        self.apply_config(self.root.config_settings)
         self.track_path_entries()
 
     def kill(self):
@@ -1568,6 +1608,9 @@ class RootTutorialFrame(StyledMenuFrame):
         StyledMenuFrame.__init__(self, parent, **kwargs)
 
         self.init_ui()
+
+        self.apply_config(self.root.config_settings)
+        self.on_start()
 
     def init_ui(self):
         self.config(
@@ -1608,6 +1651,12 @@ class RootTutorialFrame(StyledMenuFrame):
             side=tkc.RIGHT
         )
         self.update()
+
+    def apply_config(self, config_settings):
+        pass
+
+    def on_start(self):
+        pass
 
     def kill(self):
         self.root.menu_viewing=None
