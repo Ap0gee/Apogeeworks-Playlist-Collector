@@ -238,19 +238,13 @@ class RootFrame(Tk):
         }
 
         self.log = logging.getLogger(__name__)
-        self.handler_log = logging.FileHandler(
-            os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME),
-            mode='w+'
-        )
         self.formatter_log = logging.Formatter(
             '%(asctime)s %(levelname)s %(message)s'
         )
-        self.handler_log.setFormatter(self.formatter_log)
-        self.log.addHandler(self.handler_log)
-        self.log.setLevel(logging.DEBUG)
 
         self.config_settings = self.get_config()
 
+        self.apply_config(self.config_settings)
         self.on_start()
 
     def init_ui(self):
@@ -266,7 +260,6 @@ class RootFrame(Tk):
         self.geometry(
             '%dx%d+%d+%d' % (self.w, self.h, center_x, center_y)
         )
-        #TODO: show splash
         #self.frame_splash = RootSplashFrame(self)
         self.update_idletasks()
 
@@ -438,12 +431,29 @@ class RootFrame(Tk):
         with open(file_config, 'w') as f:
             self.config_settings.write(f)
 
+    def apply_config(self, config_settings):
+        setting_logfile_path = self.get_config_setting('Logging', 'LogFilePath')
+
+        if not RootConfigureFrame.verify_log_path(setting_logfile_path):
+            path_logfile = os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)
+            self.set_config('Logging', 'LogFilePath', path_logfile)
+            self.save_config()
+
     def on_start(self):
         self.console('process started')
         self.alert_action_symbol('v%s' % utils.get_version())
+        self.handler_log = logging.FileHandler(
+            self.get_config_setting('Logging', 'LogFilePath'),
+            mode='w+'
+        )
+        self.handler_log.setFormatter(self.formatter_log)
+        self.log.addHandler(self.handler_log)
+        self.log.setLevel(logging.DEBUG)
+
         for frame in self.__registered_frames:
             frame.apply_config(self.config_settings)
             frame.on_start()
+
         self.track_events()
 
     def kill(self):
@@ -1524,7 +1534,6 @@ class RootConfigureFrame(StyledMenuFrame):
         setting_frame_drag_alpha = config_settings.get('Visual', 'FrameDragAlpha')
         setting_enable_logging = config_settings.get('Logging', 'EnableLogging')
         setting_logfile_path = config_settings.get('Logging', 'LogFilePath')
-
         self.var_show_tips.set(setting_show_tips)
         self.var_frame_drag_alpha.set(setting_frame_drag_alpha)
         self.var_enable_logging.set(setting_enable_logging)
