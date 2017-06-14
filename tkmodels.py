@@ -34,6 +34,9 @@ class StyledFrame(tkinter.Frame):
     def init_ui(self):
         pass
 
+    def apply_config(self, config_settings):
+        pass
+
     def on_start(self):
         pass
 
@@ -51,6 +54,9 @@ class StyledTopLevelFrame(tkinter.Toplevel):
         self.root = utils.tk_get_root(self)
 
     def init_ui(self):
+        pass
+
+    def apply_config(self, config_settings):
         pass
 
     def on_start(self):
@@ -243,7 +249,7 @@ class RootFrame(Tk):
         self.log.addHandler(self.handler_log)
         self.log.setLevel(logging.DEBUG)
 
-        self.settings = self.get_settings()
+        self.config_settings = self.get_config()
 
         self.on_start()
 
@@ -340,7 +346,8 @@ class RootFrame(Tk):
             cursor_x, cursor_y = self.winfo_pointerxy()
 
     def track_keys(self, event):
-        self.key_map[event.keycode]()
+        callback = self.key_map[event.keycode]
+        callback()
 
     def track_events(self):
         self.after(50, self.track_events)
@@ -386,40 +393,59 @@ class RootFrame(Tk):
         self.log.info(msg, *args, **kwargs)
 
     def frame_register(self, tk_frame):
-        self.__registered_frames.append(tk_frame)
+        if not tk_frame in self.__registered_frames:
+            self.__registered_frames.append(tk_frame)
 
-    def get_settings(self):
+    def get_config(self):
         config_parser = configparser.ConfigParser()
         file_config = os.path.join(settings.DIR_CONFIG, settings.FILE_CONFIG_NAME)
-        try:
-            with open(file_config, 'r') as f:
-                return config_parser.read(f)
-        except (IOError):
-            with open(file_config, 'w') as f:
-                config_parser.add_section('General')
-                config_parser.set('General', 'StayOnTop', 'False')
-                config_parser.set('General', 'ShowTips', 'True')
-                config_parser.add_section('Visual')
-                config_parser.set('Visual', 'FrameDragAlpha', '0.8')
-                config_parser.add_section('Logging')
-                config_parser.set('Logging', 'EnableLogging', 'True')
-                config_parser.set(
-                    'Logging', 'LogFilePath', os.path.join(
-                        settings.DIR_LOGS, settings.FILE_LOG_NAME
-                    )
-                )
-                config_parser.write(f)
 
-            with open(file_config, 'r') as f:
-                return config_parser.read(f)
+        def read_settings():
+            if config_parser.read(file_config):
+                return config_parser
+            else:
+                raise FileNotFoundError
+
+        def add_settings():
+            config_parser.add_section('General')
+            config_parser.set('General', 'StayOnTop', 'False')
+            config_parser.set('General', 'ShowTips', 'True')
+            config_parser.add_section('Visual')
+            config_parser.set('Visual', 'FrameDragAlpha', '0.8')
+            config_parser.add_section('Logging')
+            config_parser.set('Logging', 'EnableLogging', 'True')
+            config_parser.set(
+                'Logging', 'LogFilePath', os.path.join(
+                    settings.DIR_LOGS, settings.FILE_LOG_NAME
+                )
+            )
+            with open(file_config, 'w') as f:
+                config_parser.write(f)
+        try:
+           return read_settings()
+        except FileNotFoundError:
+            add_settings()
+            return read_settings()
+
+    def get_config_setting(self, category, setting):
+        return self.config_settings.get(category, setting)
+
+    def set_config(self, category, setting, value):
+        self.config_settings.set(category, setting, value)
+
+    def save_config(self):
+        file_config = os.path.join(settings.DIR_CONFIG, settings.FILE_CONFIG_NAME)
+        with open(file_config, 'w') as f:
+            self.config_settings.write(f)
 
     def on_start(self):
         self.console('process started')
         self.alert_action_symbol('v%s' % utils.get_version())
-        print(self.settings)
         for frame in self.__registered_frames:
+            frame.apply_config(self.config_settings)
             frame.on_start()
         self.track_events()
+
     def kill(self):
         self.console("process terminated")
         self.destroy()
@@ -644,7 +670,7 @@ class RootMainFrame(StyledFrame):
         self.textbox_console_output.bindtags(
             (self.textbox_console_output, self.textbox_console_output, "all")
         )
-        self.textbox_console_output.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.textbox_console_output.bind_all("<MouseWheel>", self.on_mousewheel)
 
         self.textbox_console_output.tag_configure(
             c.TAG_TEXT_RED, foreground=c.COLOR_RED
@@ -979,10 +1005,12 @@ class RootMainFrame(StyledFrame):
     def state(self, value):
         self.__state = value
 
+    @classmethod
     def verify_path_playlist(self, path):
         file_name, ext = os.path.splitext(path)
         return os.path.exists(path) and ext == '.wpl'
 
+    @classmethod
     def verify_dir_collection(self, path):
         map_split = {
             'p': path.split('.'),
@@ -1036,7 +1064,7 @@ class RootMainFrame(StyledFrame):
             entry.get('widget').configure(state=state)
             entry.get('browser').configure(state=state)
 
-    def _on_done_collect_media(self):
+    def on_done_collect_media(self):
         self.console("process stopped!") if self.state is c.STATE_STOPPED else None
         self.console("done!", tag=c.TAG_TEXT_GREEN)
         self.console("logs available @ %s" % settings.DIR_LOGS, tag=c.TAG_TEXT_ORANGE, log=False)
@@ -1044,7 +1072,7 @@ class RootMainFrame(StyledFrame):
         self.set_tracked_entries_state(state=tkc.NORMAL)
         self.state = c.STATE_READY
 
-    def _on_mousewheel(self, event):
+    def on_mousewheel(self, event):
         self.textbox_console_output.yview_scroll(int(-1*(event.delta/120)), 'units')
 
     def collect_media(self, path_playlist, dir_target):
@@ -1061,7 +1089,7 @@ class RootMainFrame(StyledFrame):
             tag=c.TAG_TEXT_ORANGE
         )
         self.set_links_visible(False)
-        media_collector.collect(callback=self._on_done_collect_media)
+        media_collector.collect(callback=self.on_done_collect_media)
 
     def collect_stop(self):
         self.state = c.STATE_STOPPED
@@ -1102,6 +1130,7 @@ class RootMainFrame(StyledFrame):
                 side=tkc.LEFT
             )
 
+    @classmethod
     def view_logs(self):
         subprocess.call(["explorer", settings.DIR_LOGS])
 
@@ -1270,9 +1299,9 @@ class RootConfigureFrame(StyledMenuFrame):
     def __init__(self, parent, **kwargs):
         StyledMenuFrame.__init__(self, parent, **kwargs)
 
-        self.var_show_tips = tkinter.BooleanVar(value=True)
-        self.var_frame_drag_alpha = tkinter.IntVar(value=0.8)
-        self.var_enable_logging = tkinter.BooleanVar(value=True)
+        self.var_show_tips = tkinter.BooleanVar()
+        self.var_frame_drag_alpha = tkinter.DoubleVar()
+        self.var_enable_logging = tkinter.BooleanVar()
 
         self.init_ui()
 
@@ -1288,6 +1317,8 @@ class RootConfigureFrame(StyledMenuFrame):
         self.root.alert_action_info(
             "Configure Settings"
         )
+
+        self.on_start()
 
     def init_ui(self):
         self.config(
@@ -1444,13 +1475,6 @@ class RootConfigureFrame(StyledMenuFrame):
 
         self.update()
 
-    def set_config(self):
-        #TODO: read and set config values
-        self.entry_log_path.insert(
-            tkc.END,
-            os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)
-        )
-
     def track_path_entries(self):
         for _type, entry in self.map_tracked_entries.items():
             widget = entry.get('widget')
@@ -1490,18 +1514,43 @@ class RootConfigureFrame(StyledMenuFrame):
 
         self.after(100, self.track_path_entries)
 
+    @classmethod
     def verify_log_path(self, path):
         file_name, ext = os.path.splitext(path)
         return os.path.exists(path) and ext == '.log'
 
+    def apply_config(self, config_settings):
+        setting_show_tips = config_settings.get('General', 'ShowTips')
+        setting_frame_drag_alpha = config_settings.get('Visual', 'FrameDragAlpha')
+        setting_enable_logging = config_settings.get('Logging', 'EnableLogging')
+        setting_logfile_path = config_settings.get('Logging', 'LogFilePath')
+
+        self.var_show_tips.set(setting_show_tips)
+        self.var_frame_drag_alpha.set(setting_frame_drag_alpha)
+        self.var_enable_logging.set(setting_enable_logging)
+        self.entry_log_path.insert(0, setting_logfile_path)
+
     def on_start(self):
-        self.set_config()
+        self.apply_config(self.root.config_settings)
         self.track_path_entries()
 
     def kill(self):
+        setting_show_tips = self.var_show_tips.get()
+        setting_frame_drag_alpha = self.var_frame_drag_alpha.get()
+        setting_enable_logging = self.var_enable_logging.get()
+        setting_logfile_path = self.map_tracked_entries.get('log').get('last')
+
+        self.root.set_config('General', 'ShowTips', str(setting_show_tips))
+        self.root.set_config('Visual', 'FrameDragAlpha', str(setting_frame_drag_alpha))
+        self.root.set_config('Logging', 'EnableLogging', str(setting_enable_logging))
+        self.root.set_config('Logging', 'LogFilePath', setting_logfile_path)
+
+        self.root.save_config()
+
         self.root.menu_viewing=None
         self.after_cancel(self.track_path_entries)
         self.root.log_info('configure settings saved!')
+
         self.destroy()
 
 
