@@ -205,6 +205,8 @@ class RootFrame(Tk):
         #self.bind_all("<Alt-x>", self.track_keys)
         self.bind_all("<Alt-q>", self.track_keys)
 
+        #TODO: change map names to remain consistent
+
         self.key_map = {
             # 76: self.menu_frame.viewLoadGroup, #"<Control-l>"
             # 75: self.menu_frame.askClearGroup, #"<Control-k>"
