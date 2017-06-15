@@ -37,6 +37,9 @@ class StyledFrame(tkinter.Frame):
     def apply_config(self, config_settings):
         pass
 
+    def update_config(self):
+        pass
+
     def on_start(self):
         pass
 
@@ -57,6 +60,9 @@ class StyledTopLevelFrame(tkinter.Toplevel):
         pass
 
     def apply_config(self, config_settings):
+        pass
+
+    def update_config(self):
         pass
 
     def on_start(self):
@@ -379,7 +385,10 @@ class RootFrame(Tk):
         self.frame_main.console(msg, **kwargs)
 
     def log_info(self, msg, *args, **kwargs):
-        if self.get_config_setting('Logging', 'EnableLogging'):
+        setting_enable_logging = self.get_config_setting(
+            'Logging', 'EnableLogging'
+        ).lower()
+        if setting_enable_logging == 'true':
             self.log.info(msg, *args, **kwargs)
 
     def frame_register(self, tk_frame):
@@ -426,20 +435,42 @@ class RootFrame(Tk):
     def get_config_setting(self, category, setting):
         return self.config_settings.get(category, setting)
 
-    def set_config(self, category, setting, value):
+    @classmethod
+    def is_setting_expected_value(self, value, expected):
+        return value.lower() == expected.lower()
+
+    @classmethod
+    def is_setting_expected_type(self, value, expected):
+        return type(value) == expected
+
+    def set_config_setting(self, category, setting, value):
         self.config_settings.set(category, setting, value)
+
+    def apply_config(self):
+        setting_stay_top = self.get_config_setting('General', 'StayOnTop')
+        if not self.is_setting_expected_value(setting_stay_top, 'True'):
+            self.attributes('-topmost', False)
+        else:
+            self.attributes('-topmost', True)
+
+        setting_enable_logging = self.get_config_setting('Logging', 'EnableLogging')
+        if not self.is_setting_expected_value(setting_enable_logging, 'True'):
+            self.frame_main.label_view_logs.pack_forget()
+        else:
+            self.frame_main.label_view_logs.pack(
+                side=tkc.RIGHT
+            )
 
     def save_config(self):
         file_config = os.path.join(settings.DIR_CONFIG, settings.FILE_CONFIG_NAME)
         with open(file_config, 'w') as f:
             self.config_settings.write(f)
 
-    def apply_config(self):
+    def update_config(self):
         setting_logfile_path = self.get_config_setting('Logging', 'LogFilePath')
-
         if not RootConfigureFrame.verify_log_path(setting_logfile_path):
             path_logfile = os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)
-            self.set_config('Logging', 'LogFilePath', path_logfile)
+            self.set_config_setting('Logging', 'LogFilePath', path_logfile)
             self.save_config()
 
     def get_log(self):
@@ -1528,6 +1559,21 @@ class RootConfigureFrame(StyledMenuFrame):
         self.var_enable_logging.set(setting_enable_logging)
         self.entry_log_path.insert(0, setting_logfile_path)
 
+    def update_config(self):
+        setting_stay_top = self.var_stay_top.get()
+        setting_show_tips = self.var_show_tips.get()
+        setting_frame_drag_alpha = self.var_frame_drag_alpha.get()
+        setting_enable_logging = self.var_enable_logging.get()
+        setting_logfile_path = self.map_tracked_entries.get('log').get('last')
+
+        self.root.set_config_setting('General', 'StayOnTop', str(setting_stay_top))
+        self.root.set_config_setting('General', 'ShowTips', str(setting_show_tips))
+        self.root.set_config_setting('Visual', 'FrameDragAlpha', str(setting_frame_drag_alpha))
+        self.root.set_config_setting('Logging', 'EnableLogging', str(setting_enable_logging))
+        self.root.set_config_setting('Logging', 'LogFilePath', setting_logfile_path)
+
+        self.root.save_config()
+
     def track_path_entries(self):
         for _type, entry in self.map_tracked_entries.items():
             widget = entry.get('widget')
@@ -1565,42 +1611,14 @@ class RootConfigureFrame(StyledMenuFrame):
 
         self.after(100, self.track_path_entries)
 
-    def update_settings(self):
-        if not self.var_stay_top.get():
-            self.root.attributes('-topmost', False)
-        else:
-            self.root.attributes('-topmost', True)
-
-        if not self.var_enable_logging.get():
-            self.root.frame_main.label_view_logs.pack_forget()
-        else:
-            self.root.frame_main.label_view_logs.pack(
-                side=tkc.RIGHT
-            )
-
     def on_start(self):
         self.track_path_entries()
 
     def kill(self):
-        setting_stay_top = self.var_stay_top.get()
-        setting_show_tips = self.var_show_tips.get()
-        setting_frame_drag_alpha = self.var_frame_drag_alpha.get()
-        setting_enable_logging = self.var_enable_logging.get()
-        setting_logfile_path = self.map_tracked_entries.get('log').get('last')
-
-        self.root.set_config('General', 'StayOnTop', str(setting_stay_top))
-        self.root.set_config('General', 'ShowTips', str(setting_show_tips))
-        self.root.set_config('Visual', 'FrameDragAlpha', str(setting_frame_drag_alpha))
-        self.root.set_config('Logging', 'EnableLogging', str(setting_enable_logging))
-        self.root.set_config('Logging', 'LogFilePath', setting_logfile_path)
-
-        self.root.save_config()
-
-        self.update_settings()
+        self.update_config()
         self.root.menu_viewing = None
         self.after_cancel(self.track_path_entries)
         self.root.log_info('config settings saved!')
-
         self.destroy()
 
 
