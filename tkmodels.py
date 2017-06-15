@@ -240,19 +240,9 @@ class RootFrame(Tk):
         }
 
         self.map_config_settings = {
-            'General': {
-                'StayOnTop': 'False',
-                'ShowTips': 'True',
-            },
-            'Visual': {
-                'FrameDragAlpha': '0.8',
-            },
-            'Logging': {
-                'LoggingEnabled': 'True',
-                'LogFilePath': os.path.join(
-                    settings.DIR_LOGS, settings.FILE_LOG_NAME
-                )
-            },
+            'General': {'StayOnTop': 'False', 'ShowTips': 'True'},
+            'Visual': {'FrameDragAlpha': '0.8'},
+            'Logging': {'EnableLogging': 'True', 'LogFilePath': os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)},
         }
 
         self.config_settings = self.get_config()
@@ -340,14 +330,8 @@ class RootFrame(Tk):
 
         return screen_w/2-self.w/2, screen_h/2-self.h/2
 
-    def cloak(self, alpha):
-        if not self.is_cloaked:
-            self.attributes("-alpha", alpha)
-            self.is_cloaked = True
-
-    def un_cloak(self):
-        self.attributes("-alpha", 1)
-        self.is_cloaked = False
+    def set_alpha(self, alpha):
+        self.attributes("-alpha", alpha)
 
     def track_cursor(self):
         if not self.busy:
@@ -356,9 +340,6 @@ class RootFrame(Tk):
     def track_keys(self, event):
         callback = self.key_map[event.keycode]
         callback()
-
-    def track_events(self):
-        self.after(50, self.track_events)
 
     def alert_action_info(self, text, **kwargs):
         fg = kwargs.get('fg', c.COLOR_WHITE)
@@ -405,46 +386,60 @@ class RootFrame(Tk):
             self.__registered_frames.append(tk_frame)
 
     def get_config(self):
-        #TODO: use config setting map to ensure all settings found
         config_parser = configparser.ConfigParser()
+        file_config = os.path.join(settings.DIR_CONFIG, settings.FILE_CONFIG_NAME)
 
-        file_config = self.map_config_settings.get('Logging').get('LogFilePath')
+        def settings_verified():
+            verified = []
+            for category, map_settings in self.map_config_settings.items():
+                verified.append(config_parser.has_section(category))
+                for setting, value in map_settings.items():
+                    verified.append(config_parser.has_option(category, setting))
 
-        def read_settings():
-            if config_parser.read(file_config):
-                return config_parser
-            else:
-                raise FileNotFoundError
-
-        def verify_settings():
-            pass
+            return all(verified)
 
         def add_settings():
-            config_parser.add_section('General')
-            config_parser.set('General', 'StayOnTop', 'False')
-            config_parser.set('General', 'ShowTips', 'True')
-            config_parser.add_section('Visual')
-            config_parser.set('Visual', 'FrameDragAlpha', '0.8')
-            config_parser.add_section('Logging')
-            config_parser.set('Logging', 'EnableLogging', 'True')
-            config_parser.set(
-                'Logging', 'LogFilePath', os.path.join(
-                    settings.DIR_LOGS, settings.FILE_LOG_NAME
-                )
-            )
+            for category, map_settings in self.map_config_settings.items():
+                config_parser.add_section(category)
+                for setting, value in map_settings.items():
+                    config_parser.set(category, setting, value)
+
             with open(file_config, 'w') as f:
                 config_parser.write(f)
-        try:
-           return read_settings()
-        except FileNotFoundError:
-            add_settings()
-            return read_settings()
+
+        def read_settings():
+            try:
+                with open(file_config, 'r') as f:
+                    config_parser.read_file(f)
+
+            except (configparser.NoSectionError, configparser.NoOptionError, IOError):
+                add_settings()
+            else:
+                if not settings_verified():
+                    add_settings()
+            finally:
+                return config_parser
+
+        return read_settings()
 
     def get_config_setting(self, category, setting):
         return self.config_settings.get(category, setting)
 
     def set_config(self, category, setting, value):
         self.config_settings.set(category, setting, value)
+
+    def save_config(self):
+        file_config = os.path.join(settings.DIR_CONFIG, settings.FILE_CONFIG_NAME)
+        with open(file_config, 'w') as f:
+            self.config_settings.write(f)
+
+    def apply_config(self):
+        setting_logfile_path = self.get_config_setting('Logging', 'LogFilePath')
+
+        if not RootConfigureFrame.verify_log_path(setting_logfile_path):
+            path_logfile = os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)
+            self.set_config('Logging', 'LogFilePath', path_logfile)
+            self.save_config()
 
     def get_log(self):
         log = logging.getLogger(__name__)
@@ -460,19 +455,6 @@ class RootFrame(Tk):
         log.setLevel(logging.DEBUG)
         return log
 
-    def save_config(self):
-        file_config = os.path.join(settings.DIR_CONFIG, settings.FILE_CONFIG_NAME)
-        with open(file_config, 'w') as f:
-            self.config_settings.write(f)
-
-    def apply_config(self):
-        setting_logfile_path = self.get_config_setting('Logging', 'LogFilePath')
-
-        if not RootConfigureFrame.verify_log_path(setting_logfile_path):
-            path_logfile = os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)
-            self.set_config('Logging', 'LogFilePath', path_logfile)
-            self.save_config()
-
     def on_start(self):
         self.console('process started')
         self.alert_action_symbol('v%s' % utils.get_version())
@@ -480,8 +462,6 @@ class RootFrame(Tk):
         for frame in self.__registered_frames:
             frame.apply_config(self.config_settings)
             frame.on_start()
-
-        self.track_events()
 
     def kill(self):
         self.console("process terminated")
@@ -565,29 +545,31 @@ class RootToolFrame(StyledFrame):
         event.widget['cursor'] = c.CURSOR_ARROW
 
     def start_move(self, event):
-        self.parent.lift()
+        self.root.lift()
+
         self.x = event.x
         self.y = event.y
 
+        setting_frame_drag = self.root.get_config_setting(
+            'Visual', 'FrameDragAlpha'
+        )
+        self.root.set_alpha(setting_frame_drag)
+
     def stop_move(self, event):
         event.widget['cursor'] = c.CURSOR_HAND_2
-        self.dragging_parent = False
-        self.parent.un_cloak()
+        self.root.set_alpha(1.0)
 
     def on_motion(self, event):
-        self.dragging_parent = True
-        #self.parent.cloak(self.parent.frame_drag_alpha_value.get())
-
         delta_x = event.x - self.x
         delta_y = event.y - self.y
 
-        root_x = self.parent.winfo_x()
-        root_y = self.parent.winfo_y()
+        root_x = self.root.winfo_x()
+        root_y = self.root.winfo_y()
 
         new_x = root_x + delta_x
         new_y = root_y + delta_y
 
-        self.parent.geometry('+%s+%s' % (new_x, new_y))
+        self.root.geometry('+%s+%s' % (new_x, new_y))
 
 
 class RootMenuFrame(StyledFrame):
@@ -1533,7 +1515,6 @@ class RootConfigureFrame(StyledMenuFrame):
             verified = entry.get('verified')(path)
             last = entry.get('last')
             browser = entry.get('browser')
-            msg_path_state = '%s path verified @ "%s"'
 
             if _type == 'log':
                 if self.var_enable_logging.get():
@@ -1555,7 +1536,6 @@ class RootConfigureFrame(StyledMenuFrame):
                 entry.update(set=True)
                 browser.config(text='Change')
                 if last != path:
-                    self.root.log_info(msg_path_state % (_type, path))
                     entry.update(last=path)
                     widget.xview_moveto(1)
             else:
@@ -1576,6 +1556,7 @@ class RootConfigureFrame(StyledMenuFrame):
         setting_frame_drag_alpha = config_settings.get('Visual', 'FrameDragAlpha')
         setting_enable_logging = config_settings.get('Logging', 'EnableLogging')
         setting_logfile_path = config_settings.get('Logging', 'LogFilePath')
+
         self.var_stay_top.set(setting_stay_top)
         self.var_show_tips.set(setting_show_tips)
         self.var_frame_drag_alpha.set(setting_frame_drag_alpha)
@@ -1586,11 +1567,13 @@ class RootConfigureFrame(StyledMenuFrame):
         self.track_path_entries()
 
     def kill(self):
+        setting_stay_top = self.var_stay_top.get()
         setting_show_tips = self.var_show_tips.get()
         setting_frame_drag_alpha = self.var_frame_drag_alpha.get()
         setting_enable_logging = self.var_enable_logging.get()
         setting_logfile_path = self.map_tracked_entries.get('log').get('last')
 
+        self.root.set_config('General', 'StayOnTop', str(setting_stay_top))
         self.root.set_config('General', 'ShowTips', str(setting_show_tips))
         self.root.set_config('Visual', 'FrameDragAlpha', str(setting_frame_drag_alpha))
         self.root.set_config('Logging', 'EnableLogging', str(setting_enable_logging))
@@ -1598,9 +1581,9 @@ class RootConfigureFrame(StyledMenuFrame):
 
         self.root.save_config()
 
-        self.root.menu_viewing=None
+        self.root.menu_viewing = None
         self.after_cancel(self.track_path_entries)
-        self.root.log_info('configure settings saved!')
+        self.root.log_info('config settings saved!')
 
         self.destroy()
 

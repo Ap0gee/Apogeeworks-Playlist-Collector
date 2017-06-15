@@ -50,8 +50,8 @@ crashlytics-build.properties
 fabric.properties
 
 # Project
+*.pyc
+*.ini
 wpl/*
 *.log
 __pycache__/*
-*.pyc
-config/*
