@@ -379,7 +379,8 @@ class RootFrame(Tk):
         self.frame_main.console(msg, **kwargs)
 
     def log_info(self, msg, *args, **kwargs):
-        self.log.info(msg, *args, **kwargs)
+        if self.get_config_setting('Logging', 'EnableLogging'):
+            self.log.info(msg, *args, **kwargs)
 
     def frame_register(self, tk_frame):
         if not tk_frame in self.__registered_frames:
@@ -1087,7 +1088,8 @@ class RootMainFrame(StyledFrame):
     def on_done_collect_media(self):
         self.console("process stopped!") if self.state is c.STATE_STOPPED else None
         self.console("done!", tag=c.TAG_TEXT_GREEN)
-        self.console("logs available @ %s" % settings.DIR_LOGS, tag=c.TAG_TEXT_ORANGE, log=False)
+        if self.root.get_config_setting('Logging', 'EnableLogging'):
+            self.console("logs available @ %s" % settings.DIR_LOGS, tag=c.TAG_TEXT_ORANGE, log=False)
         self.set_links_visible()
         self.set_tracked_entries_state(state=tkc.NORMAL)
         self.state = c.STATE_READY
@@ -1508,6 +1510,24 @@ class RootConfigureFrame(StyledMenuFrame):
 
         self.update()
 
+    @classmethod
+    def verify_log_path(self, path):
+        file_name, ext = os.path.splitext(path)
+        return os.path.exists(path) and ext == '.log'
+
+    def apply_config(self, config_settings):
+        setting_stay_top = config_settings.get('General', 'StayOnTop')
+        setting_show_tips = config_settings.get('General', 'ShowTips')
+        setting_frame_drag_alpha = config_settings.get('Visual', 'FrameDragAlpha')
+        setting_enable_logging = config_settings.get('Logging', 'EnableLogging')
+        setting_logfile_path = config_settings.get('Logging', 'LogFilePath')
+
+        self.var_stay_top.set(setting_stay_top)
+        self.var_show_tips.set(setting_show_tips)
+        self.var_frame_drag_alpha.set(setting_frame_drag_alpha)
+        self.var_enable_logging.set(setting_enable_logging)
+        self.entry_log_path.insert(0, setting_logfile_path)
+
     def track_path_entries(self):
         for _type, entry in self.map_tracked_entries.items():
             widget = entry.get('widget')
@@ -1545,23 +1565,18 @@ class RootConfigureFrame(StyledMenuFrame):
 
         self.after(100, self.track_path_entries)
 
-    @classmethod
-    def verify_log_path(self, path):
-        file_name, ext = os.path.splitext(path)
-        return os.path.exists(path) and ext == '.log'
+    def update_settings(self):
+        if not self.var_stay_top.get():
+            self.root.attributes('-topmost', False)
+        else:
+            self.root.attributes('-topmost', True)
 
-    def apply_config(self, config_settings):
-        setting_stay_top = config_settings.get('General', 'StayOnTop')
-        setting_show_tips = config_settings.get('General', 'ShowTips')
-        setting_frame_drag_alpha = config_settings.get('Visual', 'FrameDragAlpha')
-        setting_enable_logging = config_settings.get('Logging', 'EnableLogging')
-        setting_logfile_path = config_settings.get('Logging', 'LogFilePath')
-
-        self.var_stay_top.set(setting_stay_top)
-        self.var_show_tips.set(setting_show_tips)
-        self.var_frame_drag_alpha.set(setting_frame_drag_alpha)
-        self.var_enable_logging.set(setting_enable_logging)
-        self.entry_log_path.insert(0, setting_logfile_path)
+        if not self.var_enable_logging.get():
+            self.root.frame_main.label_view_logs.pack_forget()
+        else:
+            self.root.frame_main.label_view_logs.pack(
+                side=tkc.RIGHT
+            )
 
     def on_start(self):
         self.track_path_entries()
@@ -1581,6 +1596,7 @@ class RootConfigureFrame(StyledMenuFrame):
 
         self.root.save_config()
 
+        self.update_settings()
         self.root.menu_viewing = None
         self.after_cancel(self.track_path_entries)
         self.root.log_info('config settings saved!')
