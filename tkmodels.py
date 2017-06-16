@@ -480,10 +480,8 @@ class RootFrame(Tk):
     def get_log(self):
         try:
             self.release_log_handlers()
-            print('append')
             file_mode = 'a'
         except AttributeError:
-            print('write')
             file_mode = 'w+'
 
         log = logging.getLogger(__name__)
@@ -491,7 +489,6 @@ class RootFrame(Tk):
         setting_logfile_path = self.get_config_setting('Logging', 'LogFilePath')
 
         if not RootConfigureFrame.verify_log_path(setting_logfile_path):
-            print('write2')
             setting_logfile_path = os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)
             self.set_config_setting('Logging', 'LogFilePath', setting_logfile_path)
             self.save_config()
@@ -1216,9 +1213,10 @@ class RootMainFrame(StyledFrame):
                 side=tkc.LEFT
             )
 
-    @classmethod
     def view_logs(self):
-        subprocess.call(["explorer", settings.DIR_LOGS])
+        path_logfile = self.root.get_config_setting('Logging', 'LogFilePath')
+        dir_logs = os.path.abspath(os.path.dirname(path_logfile))
+        subprocess.call(["explorer", dir_logs])
 
     def set_action_btn_by_state(self, state):
         map_action_btn = {
