@@ -246,14 +246,14 @@ class RootFrame(Tk):
         }
 
         self.map_config_settings = {
-            'General': {'StayOnTop': 'False', 'ShowTips': 'True'},
-            'Visual': {'FrameDragAlpha': '0.8'},
-            'Logging': {'EnableLogging': 'True', 'LogFilePath': os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)},
+            'General': {'StayOnTop': False, 'ShowTips': True},
+            'Visual': {'FrameDragAlpha': 0.8},
+            'Logging': {'EnableLogging': True, 'LogFilePath': os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)},
         }
+
 
         self.config_settings = self.get_config()
         self.apply_config()
-
         self.log = self.get_log()
 
         self.on_start()
@@ -290,14 +290,16 @@ class RootFrame(Tk):
     def menu_viewing(self, value):
         self.__menu_viewing = value
 
-    def browse_file(self, tk_entry):
+    @staticmethod
+    def browse_file(tk_entry):
         path = filedialog.askopenfilename()
 
         if not path is '':
             tk_entry.delete(0, tkc.END)
             tk_entry.insert(0, path)
 
-    def browse_directory(self, tk_entry):
+    @staticmethod
+    def browse_directory(tk_entry):
         path = filedialog.askdirectory()
 
         if not path is '':
@@ -404,7 +406,11 @@ class RootFrame(Tk):
             for category, map_settings in self.map_config_settings.items():
                 verified.append(config_parser.has_section(category))
                 for setting, value in map_settings.items():
-                    verified.append(config_parser.has_option(category, setting))
+                    verified.append(
+                        config_parser.has_option(category, setting) and self.is_setting_expected_type(
+                            config_parser.get(category, setting), type(value)
+                        )
+                    )
 
             return all(verified)
 
@@ -412,7 +418,7 @@ class RootFrame(Tk):
             for category, map_settings in self.map_config_settings.items():
                 config_parser.add_section(category)
                 for setting, value in map_settings.items():
-                    config_parser.set(category, setting, value)
+                    config_parser.set(category, setting, str(value))
 
             with open(file_config, 'w') as f:
                 config_parser.write(f)
@@ -420,9 +426,11 @@ class RootFrame(Tk):
         def read_settings():
             try:
                 with open(file_config, 'r') as f:
-                    config_parser.read_file(f)
-
-            except (configparser.NoSectionError, configparser.NoOptionError, IOError):
+                    try:
+                        config_parser.read_file(f)
+                    except (configparser.NoSectionError, configparser.NoOptionError, KeyError):
+                        raise
+            except (IOError, Exception):
                 add_settings()
             else:
                 if not settings_verified():
@@ -435,13 +443,16 @@ class RootFrame(Tk):
     def get_config_setting(self, category, setting):
         return self.config_settings.get(category, setting)
 
-    @classmethod
-    def is_setting_expected_value(self, value, expected):
+    @staticmethod
+    def is_setting_expected_value(value, expected):
         return value.lower() == expected.lower()
 
-    @classmethod
-    def is_setting_expected_type(self, value, expected):
-        return type(value) == expected
+    @staticmethod
+    def is_setting_expected_type(value, expected):
+        try:
+            return type(eval(value)) == expected
+        except NameError:
+            return False
 
     def set_config_setting(self, category, setting, value):
         self.config_settings.set(category, setting, value)
@@ -466,18 +477,29 @@ class RootFrame(Tk):
         with open(file_config, 'w') as f:
             self.config_settings.write(f)
 
-    def update_config(self):
-        setting_logfile_path = self.get_config_setting('Logging', 'LogFilePath')
-        if not RootConfigureFrame.verify_log_path(setting_logfile_path):
-            path_logfile = os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)
-            self.set_config_setting('Logging', 'LogFilePath', path_logfile)
-            self.save_config()
-
     def get_log(self):
+        try:
+            self.release_log_handlers()
+            print('append')
+            file_mode = 'a'
+        except AttributeError:
+            print('write')
+            file_mode = 'w+'
+
         log = logging.getLogger(__name__)
+
+        setting_logfile_path = self.get_config_setting('Logging', 'LogFilePath')
+
+        if not RootConfigureFrame.verify_log_path(setting_logfile_path):
+            print('write2')
+            setting_logfile_path = os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)
+            self.set_config_setting('Logging', 'LogFilePath', setting_logfile_path)
+            self.save_config()
+            file_mode = 'w+'
+
         self.handler_log = logging.FileHandler(
-            self.get_config_setting('Logging', 'LogFilePath'),
-            mode='w+'
+            setting_logfile_path,
+            mode=file_mode
         )
         self.formatter_log = logging.Formatter(
             '%(asctime)s %(levelname)s %(message)s'
@@ -485,7 +507,18 @@ class RootFrame(Tk):
         self.handler_log.setFormatter(self.formatter_log)
         log.addHandler(self.handler_log)
         log.setLevel(logging.DEBUG)
+
         return log
+
+    def refresh_log(self):
+        if not self.frame_main.state == c.STATE_COLLECTING:
+            self.log = self.get_log()
+
+    def release_log_handlers(self):
+        handlers = self.log.handlers[:]
+        for handler in handlers:
+            handler.close()
+            self.log.removeHandler(handler)
 
     def on_start(self):
         self.console('process started')
@@ -1119,7 +1152,7 @@ class RootMainFrame(StyledFrame):
     def on_done_collect_media(self):
         self.console("process stopped!") if self.state is c.STATE_STOPPED else None
         self.console("done!", tag=c.TAG_TEXT_GREEN)
-        if self.root.get_config_setting('Logging', 'EnableLogging'):
+        if self.root.get_config_setting('Logging', 'EnableLogging') == 'True':
             self.console("logs available @ %s" % settings.DIR_LOGS, tag=c.TAG_TEXT_ORANGE, log=False)
         self.set_links_visible()
         self.set_tracked_entries_state(state=tkc.NORMAL)
@@ -1541,8 +1574,8 @@ class RootConfigureFrame(StyledMenuFrame):
 
         self.update()
 
-    @classmethod
-    def verify_log_path(self, path):
+    @staticmethod
+    def verify_log_path(path):
         file_name, ext = os.path.splitext(path)
         return os.path.exists(path) and ext == '.log'
 
@@ -1585,6 +1618,8 @@ class RootConfigureFrame(StyledMenuFrame):
             if _type == 'log':
                 if self.var_enable_logging.get():
                     log_browser_state = log_entry_state = log_label_state = tkc.NORMAL
+                    if self.root.frame_main.state == c.STATE_COLLECTING:
+                        log_browser_state = log_entry_state = log_label_state = tkc.DISABLED
                 else:
                     log_browser_state = log_entry_state = log_label_state = tkc.DISABLED
 
@@ -1616,6 +1651,8 @@ class RootConfigureFrame(StyledMenuFrame):
 
     def kill(self):
         self.update_config()
+        self.root.apply_config()
+        self.root.refresh_log()
         self.root.menu_viewing = None
         self.after_cancel(self.track_path_entries)
         self.root.log_info('config settings saved!')
