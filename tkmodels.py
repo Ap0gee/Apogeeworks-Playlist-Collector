@@ -199,34 +199,20 @@ class RootFrame(Tk):
         self.bind(
             "<Map>", self.bind_redirect
         )
-        #self.bind_all("<Key>", self.track_keys)
-        #self.bind_all("<Control-l>", self.track_keys)
-        #self.bind_all("<Control-e>", self.track_keys)
-        #self.bind_all("<Control-k>", self.track_keys)
-        #self.bind_all("<Control-d>", self.track_keys)
-        #self.bind_all("<Control-m>", self.track_keys)
-        #self.bind_all("<Control-n>", self.track_keys)
-        #self.bind_all("<Control-s>", self.track_keys)
-        #self.bind_all("<Alt-i>", self.track_keys)
-        #self.bind_all("<Alt-x>", self.track_keys)
-        self.bind_all("<Alt-q>", self.track_keys)
 
-        #TODO: change map names to remain consistent
+        self.bind_all("<Alt-c>", self.on_key_press)
+        self.bind_all("<Alt-h>", self.on_key_press)
+        self.bind_all("<Alt-a>", self.on_key_press)
+        self.bind_all("<Alt-q>", self.on_key_press)
 
-        self.key_map = {
-            # 76: self.menu_frame.viewLoadGroup, #"<Control-l>"
-            # 75: self.menu_frame.askClearGroup, #"<Control-k>"
-            # 69: self.menu_frame.viewEditGroup, #"<Control-e>"
-            # 68: self.menu_frame.askDeleteGroup, #"<Control-d>"
-            # 78: self.menu_frame.viewNewGroup, #"<Control-n>"
-            # 77: self.menu_frame.viewDeleteMultipleGroup, #"<Control-m>"
-            # 83: self.summoned, #"<Control-s>"
-            # 73: self.destroy, #"<Alt-i>"
-            # 88: self.destroy, #"<Alt-x>"
-            81: self.kill, #"<Alt-q>"
+        self.map_keys = {
+            67: lambda: self.frame_menu.view_menu(RootConfigureFrame), #<Alt-c>
+            72: lambda: self.frame_menu.view_menu(RootHelpFrame), #<Alt-h>
+            65: lambda: self.frame_menu.view_menu(RootAboutFrame), #<Alt-a>
+            81: self.kill, #<Alt-q>
         }
 
-        self.tip_map = {
+        self.map_tips = {
             c.TIP_BROWSE: 'Browse for and select your paths.',
             c.TIP_START: 'Press the "Start" button to begin!',
             c.TIP_RANDOM: [
@@ -236,7 +222,7 @@ class RootFrame(Tk):
             c.TIP_LAST: ''
         }
 
-        self.error_map = {
+        self.map_errors = {
             c.ERROR_PATH_BAD: "Media at this location not found.",
             c.ERROR_EXT_BAD: "Media type not supported.",
             c.ERROR_COPY_FAILED: "Unable to copy media to destination.",
@@ -345,8 +331,8 @@ class RootFrame(Tk):
         if not self.busy:
             cursor_x, cursor_y = self.winfo_pointerxy()
 
-    def track_keys(self, event):
-        callback = self.key_map[event.keycode]
+    def on_key_press(self, event):
+        callback = self.map_keys[event.keycode]
         callback()
 
     def alert_action_info(self, text, **kwargs):
@@ -373,24 +359,21 @@ class RootFrame(Tk):
 
     def get_tip(self, tip, format='[Tip]: %s'):
         if not tip == c.TIP_RANDOM:
-            self.tip_map.update(tip_last=self.tip_map[tip])
-            return format % self.tip_map.get(c.TIP_LAST)
+            self.map_tips.update(tip_last=self.map_tips[tip])
+            return format % self.map_tips.get(c.TIP_LAST)
 
-        list_tips = self.tip_map[tip]
-        self.tip_map.update(tip_last=random.choice(list_tips))
-        return format % self.tip_map.get(c.TIP_LAST)
+        list_tips = self.map_tips[tip]
+        self.map_tips.update(tip_last=random.choice(list_tips))
+        return format % self.map_tips.get(c.TIP_LAST)
 
     def get_error(self, err):
-        return self.error_map[err]
+        return self.map_errors[err]
 
     def console(self, msg, **kwargs):
         self.frame_main.console(msg, **kwargs)
 
     def log_info(self, msg, *args, **kwargs):
-        setting_enable_logging = self.get_config_setting(
-            'Logging', 'EnableLogging'
-        ).lower()
-        if setting_enable_logging == 'true':
+        if self.is_setting_expected_value('Logging', 'EnableLogging', 'True'):
             self.log.info(msg, *args, **kwargs)
 
     def frame_register(self, tk_frame):
@@ -408,7 +391,7 @@ class RootFrame(Tk):
                 for setting, value in map_settings.items():
                     verified.append(
                         config_parser.has_option(category, setting) and self.is_setting_expected_type(
-                            config_parser.get(category, setting), type(value)
+                            category, setting, type(value)
                         )
                     )
 
@@ -443,13 +426,13 @@ class RootFrame(Tk):
     def get_config_setting(self, category, setting):
         return self.config_settings.get(category, setting)
 
-    @staticmethod
-    def is_setting_expected_value(value, expected):
+    def is_setting_expected_value(self, category, setting, expected):
+        value = self.get_config_setting(category, setting)
         return value.lower() == expected.lower()
 
-    @staticmethod
-    def is_setting_expected_type(value, expected):
+    def is_setting_expected_type(self, category, setting, expected):
         try:
+            value = self.get_config_setting(category, setting)
             return type(eval(value)) == expected
         except NameError:
             return False
@@ -458,14 +441,12 @@ class RootFrame(Tk):
         self.config_settings.set(category, setting, value)
 
     def apply_config(self):
-        setting_stay_top = self.get_config_setting('General', 'StayOnTop')
-        if not self.is_setting_expected_value(setting_stay_top, 'True'):
+        if not self.is_setting_expected_value('General', 'StayOnTop', 'True'):
             self.attributes('-topmost', False)
         else:
             self.attributes('-topmost', True)
 
-        setting_enable_logging = self.get_config_setting('Logging', 'EnableLogging')
-        if not self.is_setting_expected_value(setting_enable_logging, 'True'):
+        if not self.is_setting_expected_value('Logging', 'EnableLogging', 'True'):
             self.frame_main.label_view_logs.pack_forget()
         else:
             self.frame_main.label_view_logs.pack(
@@ -699,13 +680,19 @@ class RootMenuFrame(StyledFrame):
             command=self.parent.destroy
         )
         self.options_menu.add_command(
-            label="Configure...",
+            label="{0}{1}{2}".format("Configure..", " "*8, "(Alt + C)"),
             command=lambda: self.view_menu(RootConfigureFrame)
         )
         self.options_menu.add_separator()
         self.options_menu.add_command(
-            label="View Tutorial...",
-            command=lambda: self.view_menu(RootTutorialFrame)
+            label="{0}{1}{2}".format("Help..", " "*17, "(Alt + H)"),
+            command=lambda: self.view_menu(RootHelpFrame)
+        )
+        self.options_menu.add_separator()
+        #TODO: add about menu
+        self.options_menu.add_command(
+            label="{0}{1}{2}".format("About..", " "*14, "(Alt + A)"),
+            command=lambda: self.view_menu(RootAboutFrame)
         )
 
         self.update()
@@ -1087,13 +1074,13 @@ class RootMainFrame(StyledFrame):
     def state(self, value):
         self.__state = value
 
-    @classmethod
-    def verify_path_playlist(self, path):
+    @staticmethod
+    def verify_path_playlist(path):
         file_name, ext = os.path.splitext(path)
         return os.path.exists(path) and ext == '.wpl'
 
-    @classmethod
-    def verify_dir_collection(self, path):
+    @staticmethod
+    def verify_dir_collection(path):
         map_split = {
             'p': path.split('.'),
             'fs': path.split('/'),
@@ -1149,7 +1136,7 @@ class RootMainFrame(StyledFrame):
     def on_done_collect_media(self):
         self.console("process stopped!") if self.state is c.STATE_STOPPED else None
         self.console("done!", tag=c.TAG_TEXT_GREEN)
-        if self.root.get_config_setting('Logging', 'EnableLogging') == 'True':
+        if self.root.is_setting_expected_value('Logging', 'EnableLogging', 'True'):
             self.console("logs available @ %s" % settings.DIR_LOGS, tag=c.TAG_TEXT_ORANGE, log=False)
         self.set_links_visible()
         self.set_tracked_entries_state(state=tkc.NORMAL)
@@ -1400,10 +1387,6 @@ class RootConfigureFrame(StyledMenuFrame):
             },
         }
 
-        self.root.alert_action_info(
-            "Configure Settings"
-        )
-
         self.apply_config(self.root.config_settings)
         self.on_start()
 
@@ -1645,6 +1628,9 @@ class RootConfigureFrame(StyledMenuFrame):
         self.after(100, self.track_path_entries)
 
     def on_start(self):
+        self.root.alert_action_info(
+            "Configure Settings"
+        )
         self.track_path_entries()
 
     def kill(self):
@@ -1657,7 +1643,7 @@ class RootConfigureFrame(StyledMenuFrame):
         self.destroy()
 
 
-class RootTutorialFrame(StyledMenuFrame):
+class RootHelpFrame(StyledMenuFrame):
     def __init__(self, parent, **kwargs):
         StyledMenuFrame.__init__(self, parent, **kwargs)
 
@@ -1710,7 +1696,71 @@ class RootTutorialFrame(StyledMenuFrame):
         pass
 
     def on_start(self):
+        self.root.alert_action_info(
+            "General Help Information"
+        )
+
+    def kill(self):
+        self.root.menu_viewing=None
+        self.destroy()
+
+
+class RootAboutFrame(StyledMenuFrame):
+    def __init__(self, parent, **kwargs):
+        StyledMenuFrame.__init__(self, parent, **kwargs)
+
+        self.init_ui()
+
+        self.apply_config(self.root.config_settings)
+        self.on_start()
+
+    def init_ui(self):
+        self.config(
+            bg=c.COLOR_WHITE,
+            width=self.w,
+            height=self.h,
+        )
+        self.control_panel = StyledFrame(
+            self,
+            width=self.cp_w,
+            height=self.cp_h,
+            relief=tkc.RAISED
+        )
+        self.frame_button = tkinter.Frame(
+            self.control_panel
+        )
+        self.btn_exit = tkinter.Button(
+            self.frame_button,
+            text="EXIT",
+            font=utils.tk_font(),
+            width=6, height=1,
+            bg=c.COLOR_RED,
+            fg="white",
+            relief=tkc.FLAT,
+            command=self.kill
+        )
+        self.pack(
+            padx=(0, 0), pady=(50, 0)
+        )
+        self.control_panel.pack(
+            padx=(0, 0), pady=(10, 0)
+        )
+        self.frame_button.pack(
+            side=tkc.BOTTOM,
+            anchor=tkc.E
+        )
+        self.btn_exit.pack(
+            side=tkc.RIGHT
+        )
+        self.update()
+
+    def apply_config(self, config_settings):
         pass
+
+    def on_start(self):
+        self.root.alert_action_info(
+            "About This Software"
+        )
 
     def kill(self):
         self.root.menu_viewing=None
