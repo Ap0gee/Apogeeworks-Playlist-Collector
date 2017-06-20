@@ -27,7 +27,7 @@ class Collector():
             '.cda', '.ivf', '.aif', '.aifc', '.aiff' '.asf', '.asx', '.wax', '.wm',
             '.wma', '.wmd', '.wmv', '.wvx', '.wmp', '.wmx', '.avi', '.wav',
             '.mpeg', '.mpg', '.m1v', '.mp2', '.mpa', '.mpe', '.mp2v*', '.mpv2'
-            '.mid', '.midi', '.rmi', '.au',  '.snd', '.mp3', '.m3u', '.vob'
+            '.mid', '.midi', '.rmi', '.au',  '.snd', '.mp3', '.mp4', '.m3u', '.vob'
         ]
 
         self.root = tk_root
