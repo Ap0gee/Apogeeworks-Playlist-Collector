@@ -381,6 +381,9 @@ class RootFrame(Tk):
             self.__registered_frames.append(tk_frame)
 
     def get_config(self):
+        if not os.path.exists(settings.DIR_CONFIG):
+            os.mkdir(settings.DIR_CONFIG)
+
         config_parser = configparser.ConfigParser()
         file_config = os.path.join(settings.DIR_CONFIG, settings.FILE_CONFIG_NAME)
 
@@ -459,6 +462,8 @@ class RootFrame(Tk):
             self.config_settings.write(f)
 
     def get_log(self):
+        if not os.path.exists(settings.DIR_LOGS):
+            os.mkdir(settings.DIR_LOGS)
         try:
             self.release_log_handlers()
             file_mode = 'a'
