@@ -455,6 +455,14 @@ class RootFrame(Tk):
             self.frame_main.label_view_logs.pack(
                 side=tkc.RIGHT
             )
+        if not self.is_setting_expected_type('General', 'ShowTips', 'True'):
+            self.alert_action_info("")
+        else:
+            self.root.alert_action_info(
+                self.root.get_tip(c.TIP_RANDOM),
+                fg=c.COLOR_DARK_KNIGHT,
+                font=utils.tk_font(size=10)
+            )
 
     def save_config(self):
         file_config = os.path.join(settings.DIR_CONFIG, settings.FILE_CONFIG_NAME)
@@ -1152,11 +1160,12 @@ class RootMainFrame(StyledFrame):
 
     def collect_media(self, path_playlist, dir_target):
         self.state = c.STATE_COLLECTING
-        self.root.alert_action_info(
-            self.root.get_tip(c.TIP_RANDOM),
-            fg=c.COLOR_DARK_KNIGHT,
-            font=utils.tk_font(size=10)
-        )
+        if self.root.is_setting_expected_value('General', 'ShowTips', 'True'):
+            self.root.alert_action_info(
+                self.root.get_tip(c.TIP_RANDOM),
+                fg=c.COLOR_DARK_KNIGHT,
+                font=utils.tk_font(size=10)
+            )
         media_collector = Collector(self.root, path_playlist, dir_target)
         self.console(
             "copying media from: %s to: %s" %
