@@ -76,10 +76,11 @@ class Collector():
             return ext
 
     def get_source_file_paths(self):
+        #TODO: fix issue with media not being found
         html_data = self.as_html()
         soup = bs4.BeautifulSoup(html_data, 'html.parser')
         list_src = [
-            str(media['src']).encode(c.ENCODING_WPL) for media in soup.find_all('source')
+            os.path.abspath(media['src']).encode(c.ENCODING_WPL) for media in soup.find_all('source')
         ]
         return list_src
 

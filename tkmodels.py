@@ -482,6 +482,7 @@ class RootFrame(Tk):
             self.frame_main.label_view_logs.pack(
                 side=tkc.RIGHT
             )
+
         if not self.is_setting_expected_value('General', 'ShowTips', 'True'):
             self.alert_action_info(
                 self.get_tip(c.TIP_NONE, format='%s'),
@@ -1205,6 +1206,7 @@ class RootMainFrame(StyledFrame):
 
     def collect_media(self, path_playlist, dir_target):
         self.state = c.STATE_COLLECTING
+
         media_collector = Collector(self.root, path_playlist, dir_target)
         self.console(
             "copying media from: %s to: %s" %
