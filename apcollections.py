@@ -6,6 +6,7 @@ import _thread
 import multiprocessing.pool
 import shutil
 import bs4
+import settings
 import sys
 import os
 
@@ -82,6 +83,29 @@ class Collector():
         ]
         return list_src
 
+    def resolve_source_path(self, path):
+
+        if not os.path.exists(path):
+            possible_playlist_locations = [
+                settings.DIR_USER_PLAYLISTS,
+                settings.DIR_WMP_USER_PLAYLISTS,
+                settings.DIR_WMP_DEFAULT_PLAYLISTS,
+                settings.DIR_WMP_DEFAULT_PLAYLISTS_x86,
+            ]
+            for loc in possible_playlist_locations:
+                try:
+                    os.chdir(loc)
+                    new_path = os.path.abspath(path)
+                    if os.path.exists(new_path):
+                        return new_path
+                except:
+                    pass
+
+                finally:
+                    os.chdir(settings.DIR_BASE)
+
+        return path
+
     def __collect(self, callback=None):
         if not os.path.exists(self.dir_target):
             try:
@@ -106,12 +130,15 @@ class Collector():
             if frame_main.state is c.STATE_COLLECTING:
 
                 path_source = str(path_source, 'utf-8')
+
                 media_name_full = os.path.basename(path_source)
 
                 media_name, media_ext = self.get_path_split(media_name_full)
                 path_media_target_full = os.path.join(self.dir_target, media_name_full)
 
                 msg_failure_reason = None
+
+                path_source = self.resolve_source_path(path_source)
 
                 if os.path.exists(path_source):
                     if path_source not in self.media_found:
@@ -138,7 +165,7 @@ class Collector():
                     self.media_lost.append(path_source)
                     msg_console = "%s: %s \n=> %s" % (result_copy, path_source, msg_failure_reason)
 
-                frame_main.set_progress_collection_attr(c.PB_SETTING_VALUE, index)
+                frame_main.set_progress_collection_attr(c.PB_SETTING_VALUE, index + 1)
                 frame_main.set_result_total(c.RESULT_SUCCESS, len(self.media_found))
                 frame_main.set_result_total(c.RESULT_FAILURE, len(self.media_lost))
 

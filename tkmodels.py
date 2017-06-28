@@ -212,14 +212,23 @@ class RootFrame(Tk):
             81: self.kill, #<Alt-q>
         }
 
+        self.map_directions = {
+            c.DIRECT_BROWSE: 'Browse for and select your paths.',
+            c.DIRECT_START: 'Press the "Start" button to begin!',
+        }
+
         self.map_tips = {
-            c.TIP_BROWSE: 'Browse for and select your paths.',
-            c.TIP_START: 'Press the "Start" button to begin!',
             c.TIP_RANDOM: [
                 'You can disable these tips in "Options" > "Configure".',
                 'You can exit quickly with the "Alt+Q" shortcut.',
+                'test1',
+                'test2',
+                'test3',
+                'test4'
             ],
-            c.TIP_LAST: ''
+            c.TIP_USED: [],
+            c.TIP_LAST: '',
+            c.TIP_NONE: 'Thank you for using Apogeeworks Playlist Collector!'
         }
 
         self.map_errors = {
@@ -236,7 +245,6 @@ class RootFrame(Tk):
             'Visual': {'FrameDragAlpha': 0.8},
             'Logging': {'EnableLogging': True, 'LogFilePath': os.path.join(settings.DIR_LOGS, settings.FILE_LOG_NAME)},
         }
-
 
         self.config_settings = self.get_config()
         self.apply_config()
@@ -336,9 +344,10 @@ class RootFrame(Tk):
         callback()
 
     def alert_action_info(self, text, **kwargs):
-        fg = kwargs.get('fg', c.COLOR_WHITE)
+        tip = kwargs.get('tip', False)
+        fg = kwargs.get('fg', c.COLOR_WHITE) if not tip else c.COLOR_DARK_KNIGHT
+        font = kwargs.get('font', utils.tk_font(size=12)) if not tip else utils.tk_font(size=10)
         bg = kwargs.get('bg', c.COLOR_ORANGE)
-        font = kwargs.get('font', utils.tk_font(size=12))
 
         self.frame_footer.label_action_info.config(
             text=text,
@@ -358,13 +367,31 @@ class RootFrame(Tk):
         )
 
     def get_tip(self, tip, format='[Tip]: %s'):
-        if not tip == c.TIP_RANDOM:
-            self.map_tips.update(tip_last=self.map_tips[tip])
-            return format % self.map_tips.get(c.TIP_LAST)
 
-        list_tips = self.map_tips[tip]
-        self.map_tips.update(tip_last=random.choice(list_tips))
-        return format % self.map_tips.get(c.TIP_LAST)
+        def get_next_rand_tip():
+            random_tips = self.map_tips[c.TIP_RANDOM]
+            used_tips = self.map_tips[c.TIP_USED]
+            if used_tips != random_tips:
+                for tip in random_tips:
+                    if tip not in used_tips:
+                        used_tips.append(tip)
+                        self.map_tips[c.TIP_USED] = used_tips
+                        return tip
+            self.map_tips[c.TIP_USED] = []
+            return get_next_rand_tip()
+
+        if not tip == c.TIP_RANDOM:
+            found_tip = self.map_tips[tip]
+        else:
+            found_tip = get_next_rand_tip()
+
+        if not tip == c.TIP_NONE:
+            self.map_tips.update(tip_last=found_tip)
+
+        return format % found_tip
+
+    def get_direction(self, direction, format='%s'):
+        return format % self.map_directions[direction]
 
     def get_error(self, err):
         return self.map_errors[err]
@@ -455,6 +482,28 @@ class RootFrame(Tk):
             self.frame_main.label_view_logs.pack(
                 side=tkc.RIGHT
             )
+        if not self.is_setting_expected_value('General', 'ShowTips', 'True'):
+            self.alert_action_info(
+                self.get_tip(c.TIP_NONE, format='%s'),
+                tip=True
+            )
+            if self.frame_main.cycle_tips:
+                self.frame_main.cycle_tips = False
+        else:
+            last_tip = self.get_tip(c.TIP_LAST)
+            if last_tip:
+                self.alert_action_info(
+                    last_tip,
+                    tip=True
+                )
+            else:
+                self.alert_action_info(
+                    self.get_tip(c.TIP_RANDOM),
+                    tip=True
+                )
+            if not self.frame_main.cycle_tips and self.frame_main.has_collected:
+                self.frame_main.cycle_tips = True
+                self.frame_main.track_tips()
 
     def save_config(self):
         file_config = os.path.join(settings.DIR_CONFIG, settings.FILE_CONFIG_NAME)
@@ -506,6 +555,7 @@ class RootFrame(Tk):
     def on_start(self):
         self.console('process started')
         self.alert_action_symbol('v%s' % utils.get_version())
+        self.map_tips[c.TIP_LAST] = self.get_tip(c.TIP_RANDOM, format='%s')
 
         for frame in self.__registered_frames:
             frame.apply_config(self.config_settings)
@@ -721,6 +771,8 @@ class RootMainFrame(StyledFrame):
         self.var_media_total = tkinter.IntVar()
 
         self.__state = None
+        self.has_collected = False
+        self.cycle_tips = False
 
         self.init_ui()
 
@@ -1145,6 +1197,7 @@ class RootMainFrame(StyledFrame):
             self.console("logs available @ %s" % settings.DIR_LOGS, tag=c.TAG_TEXT_ORANGE, log=False)
         self.set_links_visible()
         self.set_tracked_entries_state(state=tkc.NORMAL)
+        self.has_collected = True
         self.state = c.STATE_READY
 
     def on_mousewheel(self, event):
@@ -1152,11 +1205,6 @@ class RootMainFrame(StyledFrame):
 
     def collect_media(self, path_playlist, dir_target):
         self.state = c.STATE_COLLECTING
-        self.root.alert_action_info(
-            self.root.get_tip(c.TIP_RANDOM),
-            fg=c.COLOR_DARK_KNIGHT,
-            font=utils.tk_font(size=10)
-        )
         media_collector = Collector(self.root, path_playlist, dir_target)
         self.console(
             "copying media from: %s to: %s" %
@@ -1165,6 +1213,16 @@ class RootMainFrame(StyledFrame):
         )
         self.set_links_visible(False)
         media_collector.collect(callback=self.on_done_collect_media)
+
+        if self.root.is_setting_expected_value('General', 'ShowTips', 'True'):
+            if not self.cycle_tips:
+                self.cycle_tips = True
+                self.track_tips()
+        else:
+            self.root.alert_action_info(
+                self.root.get_tip(c.TIP_NONE, format='%s'),
+                tip=True
+            )
 
     def collect_stop(self):
         self.state = c.STATE_STOPPED
@@ -1286,21 +1344,26 @@ class RootMainFrame(StyledFrame):
         self.after(100, self.track_path_entries)
 
     def track_collection_state(self):
+
         if self.state == c.STATE_NOT_READY:
             self.btn_start.config(
                 bg=c.COLOR_DARK_KNIGHT,
                 state=tkc.DISABLED
             )
-            if not self.root.menu_viewing:
-               self.root.alert_action_info(self.root.get_tip(c.TIP_BROWSE, format='%s'))
+            if not self.has_collected and not self.root.menu_viewing:
+                self.root.alert_action_info(
+                    self.root.get_direction(c.DIRECT_BROWSE)
+                )
 
         elif self.state == c.STATE_READY:
             self.btn_start.config(
                 bg=c.COLOR_GREEN,
                 state=tkc.NORMAL
             )
-            if not self.root.menu_viewing:
-                self.root.alert_action_info(self.root.get_tip(c.TIP_START, format='%s'))
+            if not self.has_collected and not self.root.menu_viewing:
+                self.root.alert_action_info(
+                    self.root.get_direction(c.DIRECT_START)
+                )
 
         elif self.state == c.STATE_COLLECTING:
             self.set_tracked_entries_state(state=tkc.DISABLED)
@@ -1321,6 +1384,17 @@ class RootMainFrame(StyledFrame):
 
     def track_console_output(self):
         pass
+
+    def track_tips(self):
+        if self.cycle_tips:
+            if not self.root.menu_viewing:
+                self.root.alert_action_info(
+                    self.root.get_tip(c.TIP_RANDOM),
+                    tip=True
+                )
+            self.after(1000, self.track_tips)
+        else:
+            self.after_cancel(self.track_tips)
 
     def on_start(self):
         self.track_collection_state()
@@ -1707,6 +1781,18 @@ class RootHelpFrame(StyledMenuFrame):
 
     def kill(self):
         self.root.menu_viewing=None
+
+        if self.root.is_setting_expected_value('General', 'ShowTips', 'True'):
+            self.root.alert_action_info(
+                self.root.get_tip(c.TIP_LAST),
+                tip=True,
+            )
+        else:
+            self.root.alert_action_info(
+                self.root.get_tip(c.TIP_NONE, format='%s'),
+                tip=True
+            )
+
         self.destroy()
 
 
@@ -1769,4 +1855,16 @@ class RootAboutFrame(StyledMenuFrame):
 
     def kill(self):
         self.root.menu_viewing=None
+
+        if self.root.is_setting_expected_value('General', 'ShowTips', 'True'):
+            self.root.alert_action_info(
+                self.root.get_tip(c.TIP_LAST),
+                tip=True
+            )
+        else:
+            self.root.alert_action_info(
+                self.root.get_tip(c.TIP_NONE, format='%s'),
+                tip=True
+            )
+
         self.destroy()
