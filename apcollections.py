@@ -84,6 +84,7 @@ class Collector():
         ]
         return list_src
 
+    #TODO: this is not the correct solution, try again.
     def resolve_source_path(self, path):
 
         if not os.path.exists(path):
@@ -93,17 +94,18 @@ class Collector():
                 settings.DIR_WMP_DEFAULT_PLAYLISTS,
                 settings.DIR_WMP_DEFAULT_PLAYLISTS_x86,
             ]
+
             for loc in possible_playlist_locations:
                 try:
-                    os.chdir(loc)
+                    print(os.chdir(loc))
                     new_path = os.path.abspath(path)
+                    os.chdir(settings.DIR_BASE)
                     if os.path.exists(new_path):
+                        print('returning new')
                         return new_path
-                except:
+                except WindowsError:
                     pass
 
-                finally:
-                    os.chdir(settings.DIR_BASE)
 
         return path
 

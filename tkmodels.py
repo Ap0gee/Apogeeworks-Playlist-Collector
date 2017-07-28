@@ -1394,7 +1394,7 @@ class RootMainFrame(StyledFrame):
                     self.root.get_tip(c.TIP_RANDOM),
                     tip=True
                 )
-            self.after(1000, self.track_tips)
+            self.after(5000, self.track_tips)
         else:
             self.after_cancel(self.track_tips)
 
